@@ -135,6 +135,10 @@ slab_collision_regex = re.compile(slab_collision_regex_str)
 floor_opening_regex = re.compile(floor_opening_regex_str)
 
 
+def import_fbx(path):
+    bpy.ops.import_scene.fbx(filepath=path)
+
+
 def cleanup_scene():
     print("")
     print("=== Cleaning up the scene ===")
