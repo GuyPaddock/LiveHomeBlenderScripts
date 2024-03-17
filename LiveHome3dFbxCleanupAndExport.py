@@ -200,7 +200,7 @@ def export_all_collections_to_fbx():
 def remove_unwanted_objects():
     print("Removing unwanted, non-mesh objects...")
 
-    bpy.ops.object.select_all(action='DESELECT')
+    deselect_all_objects()
 
     for ob in [o for o in bpy.data.objects if o.type == 'MESH']:
         ob.select_set(True)
@@ -536,8 +536,7 @@ def carve_openings_in_collision_mesh(collision_ob, openings):
         # Make the hollow center of the object solid.
         make_convex_hull(subtraction_mesh)
 
-        bpy.ops.object.mode_set(mode='OBJECT')
-        bpy.ops.object.select_all(action='DESELECT')
+        deselect_all_objects()
 
         bpy.context.view_layer.objects.active = collision_ob
 
@@ -1018,8 +1017,7 @@ def matchup_degenerate_pieces(degenerate_piece_names, min_volume=0.1):
                 f"'{piece2.name}' to form complete mesh '{piece1.name}'."
             )
 
-            bpy.ops.object.mode_set(mode='OBJECT')
-            bpy.ops.object.select_all(action='DESELECT')
+            deselect_all_objects()
 
             bpy.context.view_layer.objects.active = piece1
 
@@ -1147,8 +1145,7 @@ def make_convex_hull(ob):
         edges=bm.edges,
     )
 
-    bpy.ops.object.mode_set(mode='OBJECT')
-    bpy.ops.object.select_all(action='DESELECT')
+    deselect_all_objects()
 
 
 def have_common_normal(e1, e2):
