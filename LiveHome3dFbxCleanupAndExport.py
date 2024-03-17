@@ -1257,6 +1257,16 @@ def deselect_all_objects():
         pass
 
 
+def clear_file():
+    # Clear all objects from the scene
+    bpy.ops.object.select_all(action='SELECT')
+    bpy.ops.object.delete()
+
+    # Clear all collections from the scene
+    for collection in bpy.data.collections:
+        bpy.data.collections.remove(collection)
+
+
 def remove_collection_if_empty(collection_name):
     if len(bpy.data.collections[collection_name].children) == 0:
         remove_collection(collection_name)
