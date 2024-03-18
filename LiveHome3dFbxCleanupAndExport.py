@@ -1,6 +1,6 @@
 ##
 # This script can be run in Blender to re-arrange and clean-up an FBX model from
-# Live Home 3D Pro so that it's more suitable for use in Unreal Engine 4.
+# Live Home 3D Pro so that it's more suitable for use in Unreal Engine 4/5.
 #
 # All objects in Live Home 3D should follow a naming convention similar to UE4
 # naming conventions:
@@ -80,6 +80,10 @@
 #  11. Exports each collection of meshes as separate FBX files in the same
 #      folder where the Blender project file has been saved.
 #
+# Dependencies:
+#   - Blender 4.0.
+#   - Object: Bool Tool plug-in enabled.
+#
 # @author Guy Elsmore-Paddock <guy.paddock@gmail.com>
 # @author Aaron Powell <aaron@lunadigital.tv>
 #
@@ -97,6 +101,8 @@ from itertools import combinations, count
 from math import atan2, pi, radians, degrees
 from mathutils import Vector
 from pathlib import Path
+
+fbx_path = r"C:\PATH\TO\SWEET_HOME\Export.fbx"
 
 element_regex_str = \
     r"^SM_(?P<Room>(?:[^_]+))_(?P<Element>(?:(?:(?:Conduit(?:_\d{2})?_)?" \
@@ -200,15 +206,22 @@ def export_all_collections_to_fbx():
 def remove_unwanted_objects():
     print("Removing unwanted, non-mesh objects...")
 
-    deselect_all_objects()
+    meshes = [o for o in bpy.data.objects if o.type == 'MESH']
+    non_meshes = [o for o in bpy.data.objects if o.type != 'MESH']
 
-    for ob in [o for o in bpy.data.objects if o.type == 'MESH']:
-        ob.select_set(True)
-        set_parent_collection(ob, 'Ungrouped')
+    for ob in meshes:
+        print("  - Keeping '" + ob.name + "' (type '" + ob.type + "').")
 
-    bpy.ops.object.parent_clear(type='CLEAR_KEEP_TRANSFORM')
-    bpy.ops.object.select_all(action='INVERT')
-    bpy.ops.object.delete()
+    for ob in non_meshes:
+        print("  - Deleting '" + ob.name + "' (type '" + ob.type + "').")
+
+    # Remove the link between the meshes and their parents before we remove the
+    # unwanted parent objects.
+    with bpy.context.temp_override(selected_objects=meshes):
+        bpy.ops.object.parent_clear(type='CLEAR_KEEP_TRANSFORM')
+
+    with bpy.context.temp_override(selected_objects=non_meshes):
+        bpy.ops.object.delete()
 
 
 def assign_slab_names():
@@ -290,9 +303,6 @@ def group_objects_by_room_and_type():
 
                 set_parent_collection(ob, prefix)
 
-    remove_collection_if_empty('Ungrouped')
-    remove_collection_if_empty('Collection')
-
 
 def apply_model_specific_name_fixups(name):
     if name.startswith('SM_ScottBathroom_Conduit_01_Wall_02_Moulding_Crown_Righ_'):
@@ -320,19 +330,20 @@ def place_objects_on_origin():
 
     # Move objects back to origin of scene
     for ob in bpy.data.objects:
-        status_print("  - Adjusting origin of '" + ob.name + "'...")
+        if bpy.data.objects.get(ob.name):
+            status_print("  - Adjusting origin of '" + ob.name + "'...")
 
-        bpy.context.view_layer.objects.active = ob
+            bpy.context.view_layer.objects.active = ob
 
-        # Instances must be baked for us to shift origin properly.
-        bpy.ops.object.make_single_user(
-            object=True,
-            obdata=True,
-            material=False,
-            animation=False
-        )
+            # Instances must be baked for us to shift origin properly.
+            bpy.ops.object.make_single_user(
+                object=True,
+                obdata=True,
+                material=False,
+                animation=False
+            )
 
-        ob.location = ob.location - cursor.location
+            ob.location = ob.location - cursor.location
 
     print("")
 
@@ -789,7 +800,7 @@ def select_convex_boundary_edges(ob, max_edge_length_proportion=0.1):
     # Find all sharp edges and edges of similar length
     bpy.ops.mesh.select_all(action='DESELECT')
     bpy.ops.mesh.edges_select_sharp()
-    bpy.ops.mesh.select_similar(type='LENGTH', threshold=0.01)
+    bpy.ops.mesh.select_similar(type='EDGE_LENGTH', threshold=0.01)
 
     # Invert the selection to find the convex boundary edges.
     bpy.ops.mesh.select_all(action='INVERT')
@@ -1250,11 +1261,8 @@ def get_global_origin(ob):
 
 
 def deselect_all_objects():
-    try:
-        bpy.ops.object.mode_set(mode='OBJECT')
-        bpy.ops.object.select_all(action='DESELECT')
-    except:
-        pass
+    ensure_object_mode()
+    bpy.ops.object.select_all(action='DESELECT')
 
 
 def clear_file():
@@ -1266,27 +1274,34 @@ def clear_file():
     for collection in bpy.data.collections:
         bpy.data.collections.remove(collection)
 
+    bpy.ops.outliner.orphans_purge()
 
-def remove_collection_if_empty(collection_name):
-    if len(bpy.data.collections[collection_name].children) == 0:
-        remove_collection(collection_name)
+def remove_collection_by_name_if_empty(collection_name):
+    if (collection_name in bpy.data.collections and
+            len(bpy.data.collections[collection_name].children) == 0):
+        remove_collection_by_name(collection_name)
 
 
-def remove_collection(collection_name):
+def remove_collection_by_name(collection_name):
     collections = bpy.data.collections
     collections.remove(collections[collection_name])
 
 
-def create_collection_if_not_exist(name):
-    if name not in bpy.data.collections:
-        print("Creating collection: " + name)
-        bpy.data.collections.new(name)
-        bpy.context.scene.collection.children.link(bpy.data.collections[name])
+def create_collection_if_not_exist(collection_name):
+    if collection_name not in bpy.data.collections:
+        print("Creating collection: " + collection_name)
+        bpy.data.collections.new(collection_name)
+        bpy.context.scene.collection.children.link(bpy.data.collections[collection_name])
 
 
 def remove_from_all_collections(ob):
     for collection in ob.users_collection:
-        remove_from_collection(ob, collection.name)
+        remove_from_collection(ob, collection)
+
+
+def remove_from_collection(ob, collection):
+    if ob.name in collection.objects:
+        collection.objects.unlink(ob)
 
 
 def set_parent_collection(ob, collection_name):
@@ -1295,15 +1310,10 @@ def set_parent_collection(ob, collection_name):
     bpy.data.collections[collection_name].objects.link(ob)
 
 
-def remove_from_collection(ob, collection_name):
-    bpy.data.collections[collection_name].objects.unlink(ob)
-
-
 def remove_all_materials(ob):
-    ob.active_material_index = 0
-
     for i in range(len(ob.material_slots)):
-        bpy.ops.object.material_slot_remove({'object': ob})
+        ob.active_material_index = i
+        bpy.ops.object.material_slot_remove()
 
 
 def remove_all_uv_maps(ob):
@@ -1366,12 +1376,19 @@ def dupe_name_sequence(base_name, skiplist=None):
             yield duplicate_name, old_index_str, new_index
 
 
+def ensure_object_mode():
+    if bpy.context.active_object is not None and bpy.context.active_object.mode != 'OBJECT':
+        bpy.ops.object.mode_set(mode='OBJECT')
+
+
 def status_print(msg):
     formatted_msg = "%-120s" % msg
     sys.stdout.write(formatted_msg + (chr(8) * len(formatted_msg)))
     sys.stdout.flush()
 
 
+clear_file()
+import_fbx(fbx_path)
 cleanup_scene()
 setup_uvs()
 # apply_uv_grid()
