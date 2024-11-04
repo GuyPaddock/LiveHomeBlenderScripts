@@ -152,7 +152,7 @@ def cleanup_scene():
     remove_unwanted_objects()
     assign_slab_names()
     group_objects_by_room_and_type()
-    place_objects_on_origin()
+    translate_origin_of_all_objects_to_world_origin()
     simplify_geometry()
 
 
@@ -303,7 +303,23 @@ def group_objects_by_room_and_type():
                 set_parent_collection(ob, prefix)
 
 
-def place_objects_on_origin():
+def translate_origin_to_midpoint(ob):
+    ob.select_set(True)
+    bpy.ops.object.origin_set(type='ORIGIN_GEOMETRY', center='BOUNDS')
+
+
+def translate_origin_to_world_origin(ob):
+    bpy.context.view_layer.objects.active = ob
+    ob.select_set(True)
+
+    bpy.ops.transform.translate(value=(0, 0, 0), orient_type='GLOBAL')
+
+    bpy.context.scene.cursor.location = Vector((0.0, 0.0, 0.0))
+
+    bpy.ops.object.origin_set(type='ORIGIN_CURSOR', center='MEDIAN')
+
+
+def translate_origin_of_all_objects_to_world_origin():
     print("Centering and resetting floor plan origin around world origin...")
 
     bpy.ops.object.select_by_type(type='MESH')
@@ -618,8 +634,16 @@ def generate_slab_collision():
         bpy.ops.object.modifier_apply(modifier="Decimate")
 
         # Make collision mesh height match height of original mesh; it might
-        # end up being shorter
-        collision_ob.dimensions[2] = src_ob.dimensions[2]
+        # end up being shorter. The origin of each object must be set to its center
+        # for this to work properly; otherwise, it's scaling relative to the world
+        # origin.
+        translate_origin_to_midpoint(src_ob)
+        translate_origin_to_midpoint(collision_ob)
+
+        collision_ob.dimensions.z = src_ob.dimensions.z
+
+        translate_origin_to_world_origin(src_ob)
+        translate_origin_to_world_origin(collision_ob)
 
         carve_openings_in_collision_mesh(
             collision_ob,
