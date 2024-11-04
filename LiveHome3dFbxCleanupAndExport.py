@@ -263,7 +263,6 @@ def group_objects_by_room_and_type():
     prefixes = []
 
     for ob in bpy.data.objects:
-        ob.name = apply_model_specific_name_fixups(ob.name)
         element_match = element_regex.match(ob.name)
 
         if element_match is not None:
@@ -302,16 +301,6 @@ def group_objects_by_room_and_type():
                 ob.name = ob.name.replace('SM_', '')
 
                 set_parent_collection(ob, prefix)
-
-
-def apply_model_specific_name_fixups(name):
-    if name.startswith('SM_ScottBathroom_Conduit_01_Wall_02_Moulding_Crown_Righ_'):
-        name = name.replace(
-            'SM_ScottBathroom_Conduit_01_Wall_02_Moulding_Crown_Righ_',
-            'SM_ScottBathroom_Conduit_01_Wall_02_Moulding_Crown_Right_'
-        )
-
-    return name
 
 
 def place_objects_on_origin():
