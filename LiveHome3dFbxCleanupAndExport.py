@@ -560,7 +560,7 @@ def carve_openings_in_collision_mesh(collision_ob, openings):
         collision_ob.select_set(True)
 
         bpy.ops.object.modifier_apply(modifier="Auto Boolean")
-        bpy.ops.object.booltool_auto_difference()
+        bpy.ops.object.boolean_auto_difference()
 
         deselect_all_objects()
 
