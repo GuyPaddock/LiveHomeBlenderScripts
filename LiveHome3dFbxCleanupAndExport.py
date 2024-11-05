@@ -679,19 +679,20 @@ def create_collision_mesh_from(src_ob):
 
 
 def create_inplace_copy_of(src_ob):
-    collision_ob = src_ob.copy()
+    copy_ob = src_ob.copy()
 
-    collision_ob.data = src_ob.data.copy()
-    collision_ob.show_wire = True
-    collision_ob.parent = src_ob
+    copy_ob.data = src_ob.data.copy()
+    copy_ob.show_wire = True
+    copy_ob.parent = src_ob
 
-    # Shift coordinate system of child so it doesn't get offset by parent
-    collision_ob.matrix_parent_inverse = src_ob.matrix_world.inverted()
+    # Shift coordinate system of child, so it doesn't get offset by parent
+    copy_ob.matrix_parent_inverse = src_ob.matrix_world.inverted()
 
-    parent_collection = src_ob.users_collection[0]
-    set_parent_collection(collision_ob, parent_collection.name)
+    if src_ob.users_collection:
+        parent_collection = src_ob.users_collection[0]
+        set_parent_collection(copy_ob, parent_collection.name)
 
-    return collision_ob
+    return copy_ob
 
 
 def wall_openings_of(parent_ob):
