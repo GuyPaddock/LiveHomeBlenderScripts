@@ -176,22 +176,22 @@ def export_all_collections_to_fbx():
     print("=== Exporting scene to FBX ===")
 
     for coll in bpy.data.collections:
-        status_print("  - Exporting collection '" + coll.name + "' to FBX...")
+        status_print(f"  - Exporting collection '{coll.name}' to FBX...")
+
+        # Select only objects in the current collection.
+        deselect_all_objects()
+
+        for obj in coll.all_objects:
+            obj.select_set(True)
 
         try:
             bpy.ops.export_scene.fbx(
-                {
-                    'object': None,
-                    'active_object': None,
-                    'selected_objects': coll.all_objects
-                },
-                filepath=str(
-                    Path(bpy.data.filepath).parent / f"{coll.name}.fbx"
-                ),
+                filepath=str(Path(bpy.data.filepath).parent / f"{coll.name}.fbx"),
                 use_selection=True,
                 mesh_smooth_type='FACE',
                 use_tspace=True,
                 bake_space_transform=True,
+                check_existing=False
             )
 
         except RuntimeError:
