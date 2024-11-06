@@ -91,14 +91,13 @@
 import bmesh
 import bpy
 import math
-import operator
 import re
 import sys
 import time
 
 from collections import OrderedDict
-from itertools import combinations, count
-from math import atan2, pi, radians, degrees
+from itertools import count
+from math import radians
 from mathutils import Vector
 from pathlib import Path
 
@@ -514,11 +513,7 @@ def generate_basic_collision():
             openings=wall_openings_of(src_ob)
         )
 
-        split_into_convex_pieces(
-            collision_ob,
-            create_closed_objects=False,
-            matchup_degenerates=False
-        )
+        decompose_into_convex_parts(collision_ob)
 
         # Uncomment this line if you don't want collision meshes to have any
         # faces so that the model looks "neater" in Blender. It has no impact on
@@ -651,11 +646,7 @@ def generate_slab_collision():
         )
 
         print("    - Splitting collision mesh into convex pieces...")
-        split_into_convex_pieces(
-            collision_ob,
-            create_closed_objects=False,
-            matchup_degenerates=False
-        )
+        decompose_into_convex_parts(collision_ob)
 
         # Uncomment this line if you don't want collision meshes to have any
         # faces so that the model looks "neater" in Blender. It has no impact on
@@ -711,26 +702,6 @@ def floor_openings():
         yield opening_ob
 
 
-def split_into_convex_pieces(ob, create_closed_objects=True,
-                             matchup_degenerates=True):
-    object_name = ob.name
-
-    deselect_all_objects()
-    make_all_faces_convex(ob)
-
-    eliminated_piece_names = \
-        split_on_convex_boundaries(
-            ob,
-            create_closed_objects,
-            matchup_degenerates
-        )
-
-    rename_pieces(object_name, eliminated_piece_names)
-
-    # Deselect everything, for the convenience of the user.
-    deselect_all_objects()
-
-
 def make_all_faces_convex(ob):
     bpy.context.view_layer.objects.active = ob
     bpy.ops.object.mode_set(mode='EDIT')
@@ -740,412 +711,6 @@ def make_all_faces_convex(ob):
     bpy.ops.mesh.select_all(action='SELECT')
     bpy.ops.mesh.vert_connect_concave()
     bpy.ops.mesh.select_all(action='DESELECT')
-
-
-##
-# Splits an object into smaller pieces by its convex, planar edges.
-#
-# In an ideal world, we could just split the object by all the edges that are
-# attached to -- and are co-planar with -- the faces of the object, since those
-# edges are most likely to represent the convex boundaries of the object. But,
-# Blender does not provide an easy way to find such edges.
-#
-# Instead, we use several heuristics to simulate this type of selection:
-#   1. First, we select all the sharp edges of the object, since sharp edges are
-#      only co-planar with one of the faces they connect with and are therefore
-#      unlikely to represent convex boundary edges.
-#   2. Second, we select all edges that are similar in angle to the sharp edges,
-#      to catch any edges that are almost steep enough to be sharp edges.
-#   3. Third, we invert the selection, which should (hopefully) cause all the
-#      convex boundary edges we want to be selected.
-#   4. Fourth, we seek out any sharp edges that connect with the convex boundary
-#      edges, since we will need to split on these edges as well so that our
-#      "cuts" go all the way around the object (e.g. if the convex boundary
-#      edges lay on the top and bottom faces of an object, we need to select
-#      sharp edges to connect the top and bottom edges on the left and right
-#      sides so that each split piece is a complete shape instead of just
-#      disconnected, detached planes).
-#   4. Next, we split the object by all selected edges, which should result in
-#      creation of each convex piece we seek.
-#
-def split_on_convex_boundaries(ob, create_closed_objects=True,
-                               matchup_degenerates=True):
-    bpy.ops.object.mode_set(mode='EDIT')
-
-    select_convex_boundary_edges(ob)
-
-    # Now perform an vertex + edge split along each selected edge, which should
-    # result in the object being broken-up along each planar edge and connected
-    # sharp edges (e.g. on corners).
-    bpy.ops.mesh.edge_split(type='VERT')
-
-    # Now, just break each loose part off into a separate object.
-    bpy.ops.mesh.select_all(action='SELECT')
-    bpy.ops.mesh.separate(type='LOOSE')
-
-    if create_closed_objects:
-        # And then make each piece fully enclosed.
-        return create_closed_shapes_from_pieces(ob, matchup_degenerates)
-    else:
-        return []
-
-
-##
-# Selects all edges that denote the boundaries of convex pieces.
-#
-# This is a multistep process driven by heuristics:
-#   1. First, we select all the sharp edges of the object, since sharp edges are
-#      only co-planar with one of the faces they connect with and are therefore
-#      unlikely to represent convex boundary edges.
-#   2. Second, we select all edges that are similar in length to the sharp
-#      edges, to catch any edges that are almost steep enough to be sharp edges.
-#   3. Third, we invert the selection, which should (hopefully) cause all the
-#      convex boundary edges we want to be selected.
-#
-def select_convex_boundary_edges(ob, max_edge_length_proportion=0.1):
-    bpy.ops.object.mode_set(mode='EDIT')
-
-    mesh = ob.data
-    bm = bmesh.from_edit_mesh(mesh)
-
-    # Enter "Edge" select mode
-    bpy.context.tool_settings.mesh_select_mode = [False, True, False]
-
-    # Find all sharp edges and edges of similar length
-    bpy.ops.mesh.select_all(action='DESELECT')
-    bpy.ops.mesh.edges_select_sharp()
-    bpy.ops.mesh.select_similar(type='EDGE_LENGTH', threshold=0.01)
-
-    # Invert the selection to find the convex boundary edges.
-    bpy.ops.mesh.select_all(action='INVERT')
-
-    bm.faces.ensure_lookup_table()
-    bm.edges.ensure_lookup_table()
-
-    edges_to_select = []
-    max_edge_length = max(ob.dimensions) * max_edge_length_proportion
-
-    for selected_edge in [e for e in bm.edges if e.select]:
-        edge_bridges = \
-            find_shortest_edge_bridges(
-                selected_edge,
-                max_edge_length=max_edge_length
-            )
-
-        for path in edge_bridges.values():
-            for edge in path:
-                edges_to_select.append(edge)
-
-    # Select the edges after we pick which edges we *want* to select, to ensure
-    # that we only base our decisions on the initial convex boundary edges.
-    for edge in edges_to_select:
-        edge.select = True
-
-
-##
-# Locate the shortest path of edges to connect already-selected edges.
-#
-# This is used to find the additional edges that must be selected for a cut
-# along a convex boundary to create a complete, closed object shape.
-#
-# The max edge length argument can be provided to avoid trying to find
-# connections between convex boundaries that are very far apart in the same
-# object.
-#
-def find_shortest_edge_bridges(starting_edge, max_edge_length=None):
-    edge_bridges = find_bridge_edges(starting_edge, max_edge_length)
-    sorted_edge_bridges = sorted(edge_bridges, key=lambda eb: eb[0])
-    edge_solutions = {}
-
-    for edge_bridge in sorted_edge_bridges:
-        path_distance, final_edge, path = edge_bridge
-
-        # Skip edges we've already found a min-length path to
-        if final_edge not in edge_solutions.keys():
-            edge_solutions[final_edge] = path
-
-    print(f"Shortest edge bridges for starting edge '{str(starting_edge.index)}':")
-
-    if len(edge_solutions) > 0:
-        print(
-            "  - " +
-            "\n  - ".join(map(
-                lambda i: str(
-                    (i[0].index, str(list(map(lambda e: e.index, i[1]))))
-                ),
-                edge_solutions.items()
-            )))
-    print("")
-    print("")
-
-    return edge_solutions
-
-
-##
-# Performs a recursive, depth-first search from a selected edge to other edges.
-#
-# This returns all possible paths -- and distances of those paths -- to traverse
-# the mesh from the starting, selected edge to another selected edge. To avoid
-# a lengthy search, the max_depth parameter controls how many levels of edges
-# are searched.
-#
-# The result is an array of tuples, where each tuple contains the total distance
-# of the path, the already-selected edge that the path was able to reach, and
-# the list of edges that would need to be selected in order to reach that
-# destination edge.
-#
-def find_bridge_edges(edge, max_edge_length=None, max_depth=3, current_depth=0,
-                      path_distance=0, edge_path=None, seen_verts=None):
-    if edge_path is None:
-        edge_path = []
-
-    if seen_verts is None:
-        seen_verts = []
-
-    # Don't bother searching edges we've seen
-    if edge in edge_path:
-        return []
-
-    if (current_depth > 0):
-        first_edge = edge_path[0]
-        edge_length = edge.calc_length()
-
-        # Don't bother searching edges along the same normal as the first edge.
-        # We want our cuts to be along convex boundaries that are perpendicular.
-        if have_common_face(first_edge, edge):
-            return []
-
-        if edge.select:
-            return [(path_distance, edge, edge_path)]
-
-        # Disqualify edges that are too long.
-        if max_edge_length is not None and edge_length > max_edge_length:
-            print(
-                f"Disqualifying edge {edge.index} because length [{edge_length}] > [{max_edge_length}"
-            )
-
-            return []
-
-    if current_depth == max_depth:
-        return []
-
-    new_edge_path = edge_path + [edge]
-    bridges = []
-
-    for edge_vert in edge.verts:
-        # Don't bother searching vertices we've already seen (no backtracking).
-        if edge_vert in seen_verts:
-            continue
-
-        new_seen_verts = seen_verts + [edge_vert]
-
-        for linked_edge in edge_vert.link_edges:
-            # Don't bother searching selected edges connected to the starting
-            # edge, since that gets us nowhere.
-            if linked_edge.select and current_depth == 0:
-                continue
-
-            edge_length = linked_edge.calc_length()
-
-            found_bridge_edges = find_bridge_edges(
-                edge=linked_edge,
-                max_edge_length=max_edge_length,
-                max_depth=max_depth,
-                current_depth=current_depth + 1,
-                path_distance=path_distance + edge_length,
-                edge_path=new_edge_path,
-                seen_verts=new_seen_verts
-            )
-
-            bridges.extend(found_bridge_edges)
-
-    return bridges
-
-
-def create_closed_shapes_from_pieces(ob, matchup_degenerates=True,
-                                     min_volume=0.1):
-    print("Converting each piece into a closed object...")
-
-    degenerate_piece_names = []
-
-    for piece in name_duplicates_of(ob):
-        if not make_piece_convex(piece):
-            degenerate_piece_names.append(piece.name)
-
-    degenerate_count = len(degenerate_piece_names)
-
-    print("")
-    print(f"Total degenerate (flat) pieces: {degenerate_count}")
-    print("")
-
-    eliminated_piece_names = []
-
-    if matchup_degenerates:
-        if degenerate_count > 10:
-            # TODO: Hopefully, some day, find a good deterministic way to
-            # automatically match up any number of degenerate pieces using a
-            # heuristic that generates sane geometry.
-            print(
-                "There are too many degenerates for reliable auto-matching, so "
-                "it will not be performed. You will need to manually combine "
-                "degenerate pieces.")
-            print("")
-        else:
-            eliminated_piece_names.extend(
-                matchup_degenerate_pieces(degenerate_piece_names, min_volume)
-            )
-
-            eliminated_piece_names.extend(
-                eliminate_tiny_pieces(degenerate_piece_names, min_volume)
-            )
-
-    return eliminated_piece_names
-
-
-def matchup_degenerate_pieces(degenerate_piece_names, min_volume=0.1):
-    pieces_eliminated = []
-    degenerate_volumes = find_degenerate_combos(degenerate_piece_names)
-
-    print("Searching for a way to match-up degenerates into volumes...")
-
-    for piece1_name, piece1_volumes in degenerate_volumes.items():
-        # Skip pieces already joined with degenerate pieces we've processed
-        if piece1_name not in degenerate_piece_names:
-            continue
-
-        piece1 = bpy.data.objects[piece1_name]
-
-        piece1_volumes_asc = dict(
-            sorted(
-                piece1_volumes.items(),
-                key=operator.itemgetter(1)
-            )
-        )
-
-        piece2 = None
-
-        for piece2_name, combo_volume in piece1_volumes_asc.items():
-            # Skip pieces that would make a volume that's too small, or that
-            # have been joined with degenerate pieces we've processed
-            if combo_volume < min_volume or piece2_name not in degenerate_piece_names:
-                continue
-            else:
-                piece2 = bpy.data.objects[piece2_name]
-                break
-
-        if piece2 is not None:
-            degenerate_piece_names.remove(piece2.name)
-            pieces_eliminated.append(piece2.name)
-
-            print(
-                f"  - Combining parallel degenerate '{piece1.name}' with "
-                f"'{piece2.name}' to form complete mesh '{piece1.name}'."
-            )
-
-            deselect_all_objects()
-
-            bpy.context.view_layer.objects.active = piece1
-
-            piece1.select_set(True)
-            piece2.select_set(True)
-
-            bpy.ops.object.join()
-
-            make_piece_convex(piece1)
-
-    return pieces_eliminated
-
-
-def find_degenerate_combos(degenerate_piece_names):
-    volumes = {}
-
-    for piece_combo in combinations(degenerate_piece_names, 2):
-        piece1_name, piece2_name = piece_combo
-        piece1 = bpy.data.objects[piece1_name]
-        piece2 = bpy.data.objects[piece2_name]
-
-        if not volumes.get(piece1_name):
-            volumes[piece1_name] = {}
-
-        piece1_mesh = piece1.data
-        piece1_bm = bmesh.new()
-        piece1_bm.from_mesh(piece1_mesh)
-
-        piece2_mesh = piece2.data
-        piece2_bm = bmesh.new()
-        piece2_bm.from_mesh(piece2_mesh)
-
-        piece1_bm.faces.ensure_lookup_table()
-        piece2_bm.faces.ensure_lookup_table()
-
-        if (len(piece1_bm.faces) == 0) or (len(piece2_bm.faces) == 0):
-            continue
-
-        piece1_face = piece1_bm.faces[0]
-        piece2_face = piece2_bm.faces[0]
-
-        combo_angle_radians = piece1_face.normal.angle(piece2_face.normal)
-        combo_angle_degrees = int(round(degrees(combo_angle_radians)))
-
-        # We only combine faces that are parallel to each other
-        if combo_angle_degrees in [0, 180]:
-            combo_volume = convex_volume(piece1, piece2)
-
-            volumes[piece1.name][piece2.name] = combo_volume
-
-    return volumes
-
-
-def eliminate_tiny_pieces(degenerate_piece_names, min_volume=0.1):
-    eliminated_piece_names = []
-
-    tiny_piece_names = [
-        n for n in degenerate_piece_names
-        if n not in eliminated_piece_names
-           and convex_volume(bpy.data.objects.get(n)) < min_volume
-    ]
-
-    print("")
-    print(f"Total remaining tiny pieces: {len(tiny_piece_names)}")
-
-    # Delete tiny pieces that are too small to be useful
-    for tiny_piece_name in tiny_piece_names:
-        print(f"  - Eliminating tiny piece '{tiny_piece_name}'...")
-
-        tiny_piece = bpy.data.objects[tiny_piece_name]
-
-        bpy.data.objects.remove(tiny_piece, do_unlink=True)
-        eliminated_piece_names.append(tiny_piece_name)
-
-    print("")
-
-    return eliminated_piece_names
-
-
-def make_piece_convex(ob, min_volume=0.1):
-    print(
-        f"  - Attempting to make '{ob.name}' into a closed, convex "
-        f"shape."
-    )
-
-    volume_before = convex_volume(ob)
-
-    make_convex_hull(ob)
-
-    volume_after = convex_volume(ob)
-    volume_delta = abs(volume_after - volume_before)
-
-    # If the volume of the piece is very small when we tried making it convex,
-    # then it's degenerate -- it's a plane or something flat that we need to
-    # remove.
-    is_degenerate = (volume_after < min_volume)
-
-    print(f"    - Volume before: {volume_before}")
-    print(f"    - Volume after: {volume_after}")
-    print(f"    - Volume delta: {volume_delta}")
-    print(f"    - Is degenerate: {is_degenerate}")
-
-    return not is_degenerate
 
 
 def make_convex_hull(ob):
@@ -1171,59 +736,6 @@ def make_convex_hull(ob):
     )
 
     deselect_all_objects()
-
-
-def have_common_normal(e1, e2):
-    e1_normals = map(lambda f: f.normal, e1.link_faces)
-    e2_normals = map(lambda f: f.normal, e2.link_faces)
-
-    common_normals = [n for n in e1_normals if n in e2_normals]
-
-    return len(common_normals) > 0
-
-
-def have_common_face(e1, e2):
-    common_faces = [f for f in e1.link_faces if f in e2.link_faces]
-
-    return len(common_faces) > 0
-
-
-# From https://blenderartists.org/t/finding-the-angle-between-edges-in-a-mesh-using-python/510618/2
-def calc_edge_angle2(e1, e2):
-    e1_vector = Vector(e1.verts[0].co) - Vector(e1.verts[1].co)
-    e2_vector = Vector(e2.verts[0].co) - Vector(e2.verts[1].co)
-
-    angle_in_radians = e1_vector.angle(e2_vector)
-
-    return int(round(degrees(angle_in_radians)))
-
-
-# From https://blender.stackexchange.com/a/203355/115505
-def calc_edge_angle(e1, e2, face_normal):
-    # project into XY plane,
-    up = Vector((0, 0, 1))
-
-    b = set(e1.verts).intersection(e2.verts).pop()
-    a = e1.other_vert(b).co - b.co
-    c = e2.other_vert(b).co - b.co
-    a.negate()
-    axis = a.cross(c).normalized()
-
-    if axis.length < 1e-5:
-        angle_in_radians = pi  # inline vert
-
-    else:
-        if axis.dot(face_normal) < 0:
-            axis.negate()
-
-        M = axis.rotation_difference(up).to_matrix().to_4x4()
-
-        a = (M @ a).xy.normalized()
-        c = (M @ c).xy.normalized()
-
-        angle_in_radians = pi - atan2(a.cross(c), a.dot(c))
-
-    return int(round(degrees(angle_in_radians)))
 
 
 def convex_volume(*obs):
@@ -1266,12 +778,6 @@ def build_volume_from_verts(verts):
     bmesh.ops.convex_hull(bm, input=bm.verts)
 
     return bm.calc_volume()
-
-
-def get_global_origin(ob):
-    local_bbox_center = 0.125 * sum((Vector(b) for b in ob.bound_box), Vector())
-
-    return ob.matrix_world @ local_bbox_center
 
 
 def deselect_all_objects():
@@ -1399,6 +905,147 @@ def status_print(msg):
     formatted_msg = "%-120s" % msg
     sys.stdout.write(formatted_msg + (chr(8) * len(formatted_msg)))
     sys.stdout.flush()
+
+
+def decompose_into_convex_parts(ob, max_iterations=5, volume_threshold=0.01):
+    """
+    Decompose an object into convex parts using convex hulls and boolean operations.
+
+    :param ob: The input object to decompose.
+    :param max_iterations: The maximum number of decomposition iterations.
+    :param volume_threshold: Minimum volume threshold to consider a part.
+    """
+    ob.select_set(True)
+    bpy.context.view_layer.objects.active = ob
+
+    for i in range(max_iterations):
+        if is_convex(ob):
+            # Stop if the object is already convex.
+            print(f"  - {ob.name} is already convex.")
+            break
+
+        convex_hull = create_convex_hull(ob)
+        convex_hull.name = f"{ob.name}_convex_part_{i}"
+
+        boundary_faces = identify_boundary_faces(ob, convex_hull)
+        if not boundary_faces:
+            # No more boundary faces to split on.
+            break
+
+        new_part = split_object(ob, boundary_faces)
+        new_part.name = f"{ob.name}_part_{i}"
+
+        if convex_volume(new_part) < volume_threshold:
+            bpy.data.objects.remove(new_part)
+            continue
+
+    print(f"  - Convex decomposition of {ob.name} is complete.")
+
+
+def is_convex(ob):
+    """Check if the object is convex by verifying no internal faces violate convexity."""
+    bm = bmesh.new()
+    bm.from_mesh(ob.data)
+    bm.faces.ensure_lookup_table()
+
+    threshold_angle = math.radians(180)
+
+    # Convex if no angles exceed the threshold.
+    result = True
+
+    for edge in bm.edges:
+        linked_faces = edge.link_faces
+        if len(linked_faces) == 2:  # Only consider pairs of adjacent faces
+            angle = angle_between_face_normals(linked_faces[0], linked_faces[1])
+
+            # Concave if angle exceeds threshold
+            if angle > threshold_angle:
+                result = False
+                break
+
+    bm.free()
+
+    return result
+
+
+def angle_between_face_normals(face1, face2):
+    """
+    Calculate the angle in radians between the normals of two given faces.
+
+    Args:
+        face1 (bmesh.types.BMFace): The first face.
+        face2 (bmesh.types.BMFace): The second face.
+
+    Returns:
+        float: The angle in radians between the two face normals.
+    """
+    normal1 = face1.normal
+    normal2 = face2.normal
+
+    if normal1.length == 0 or normal2.length == 0:
+      result = 0
+    else:
+      result = normal1.angle(normal2)
+
+    return result
+
+
+def create_convex_hull(ob):
+    """Create and return a convex hull object around the provided object."""
+    bpy.ops.object.mode_set(mode='OBJECT')
+    ob.select_set(True)
+    bpy.ops.object.duplicate()
+    convex_hull = bpy.context.active_object
+    bpy.ops.object.mode_set(mode='EDIT')
+    bpy.ops.mesh.convex_hull()
+    bpy.ops.object.mode_set(mode='OBJECT')
+
+    return convex_hull
+
+
+def identify_boundary_faces(ob, convex_hull, max_convex_deviation=0.001):
+    """
+    Identify boundary faces between an object and its convex hull,
+    which can serve as split points for decomposition.
+    """
+    boundary_faces = []
+    bm = bmesh.new()
+    bm.from_mesh(ob.data)
+    bm.faces.ensure_lookup_table()
+
+    for face in bm.faces:
+        face_center = face.calc_center_median()
+
+        # Unpack the return values from closest_point_on_mesh
+        found, closest_point, normal, index = convex_hull.closest_point_on_mesh(face_center)
+
+        if found:
+            closest_point_vector = closest_point
+
+            # Calculate the distance
+            distance = (face_center - closest_point_vector).length
+
+            if distance > max_convex_deviation:
+                boundary_faces.append(face)
+
+    bm.free()
+    return boundary_faces
+
+
+def split_object(ob, boundary_faces):
+    """
+    Split the object using identified boundary faces. Creates a new object from the split part.
+    """
+    bpy.ops.object.mode_set(mode='EDIT')
+    bpy.ops.mesh.select_all(action='DESELECT')
+
+    for face in boundary_faces:
+        face.select = True
+
+    bpy.ops.mesh.separate(type='SELECTED')
+    bpy.ops.object.mode_set(mode='OBJECT')
+
+    return bpy.context.selected_objects[-1]  # Return new part after split
 
 
 clear_file()
