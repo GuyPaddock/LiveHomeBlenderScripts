@@ -147,6 +147,7 @@ floor_opening_regex = re.compile(floor_opening_regex_str)
 
 def import_fbx(path):
     bpy.ops.import_scene.fbx(filepath=path)
+    repaint_screen()
 
 
 def cleanup_scene():
@@ -227,6 +228,8 @@ def remove_unwanted_objects_by_type():
 
     with bpy.context.temp_override(selected_objects=non_meshes):
         bpy.ops.object.delete()
+
+    repaint_screen()
 
 
 def assign_slab_names():
@@ -369,6 +372,7 @@ def translate_origin_of_all_objects_to_world_origin():
             ob.location = ob.location - cursor.location
 
     print("")
+    repaint_screen()
 
     # This doesn't properly snap instances but that might be ok for now
     cursor.location = (0, 0, 0)
@@ -376,6 +380,8 @@ def translate_origin_of_all_objects_to_world_origin():
     for ob in bpy.data.objects:
         bpy.context.view_layer.objects.active = ob
         bpy.ops.object.origin_set(type='ORIGIN_CURSOR', center='MEDIAN')
+
+    repaint_screen()
 
 
 def simplify_geometry():
@@ -397,6 +403,7 @@ def simplify_geometry():
 
     print("")
     deselect_all_objects()
+    repaint_screen()
 
 
 def generate_diffuse_uvs():
@@ -507,6 +514,7 @@ def apply_uv_grid():
             bpy.ops.object.material_slot_assign()
 
         print("")
+        repaint_screen()
 
 
 def generate_basic_collision():
@@ -524,6 +532,9 @@ def generate_basic_collision():
         status_print("  - Generating collision for '" + src_ob.name + "'...")
 
         deselect_all_objects()
+
+        focus_on_object(src_ob)
+        repaint_screen()
 
         # Create a temporary object that represents a simpler, cleaner version of this object for
         # generating collision. We carve holes in this simpler version for things like window and
@@ -545,6 +556,8 @@ def generate_basic_collision():
         reparent_children_to_grandparent(collision_ob)
         objects_to_delete.append(collision_ob)
 
+        repaint_screen()
+
     print("")
     deselect_all_objects()
 
@@ -559,6 +572,9 @@ def carve_openings_in_collision_mesh(collision_ob, openings):
     deselect_all_objects()
 
     for opening in openings:
+        focus_on_object(opening)
+        repaint_screen()
+
         subtraction_mesh = create_inplace_copy_of(opening)
 
         # Make a solid object out of the opening.
@@ -596,6 +612,7 @@ def carve_openings_in_collision_mesh(collision_ob, openings):
         bpy.ops.object.modifier_apply(modifier="Remesh")
 
         deselect_all_objects()
+        repaint_screen()
 
 
 def generate_slab_collision():
@@ -613,6 +630,9 @@ def generate_slab_collision():
         print(f"  - Generating slab collision for '{src_ob.name}':")
 
         deselect_all_objects()
+
+        focus_on_object(src_ob)
+        repaint_screen()
 
         collision_ob = create_blank_copy_of(src_ob)
 
@@ -660,6 +680,7 @@ def generate_slab_collision():
         bpy.context.object.modifiers["Remesh"].threshold = 1
         bpy.context.object.modifiers["Remesh"].use_smooth_shade = True
         bpy.ops.object.modifier_apply(modifier="Remesh")
+        repaint_screen()
 
         print("    - Simplifying faces of collision mesh geometry...")
         # Simplify the slab collision; this typically can reduce the mesh from
@@ -667,6 +688,7 @@ def generate_slab_collision():
         bpy.ops.object.modifier_add(type='DECIMATE')
         bpy.context.object.modifiers["Decimate"].decimate_type = 'DISSOLVE'
         bpy.ops.object.modifier_apply(modifier="Decimate")
+        repaint_screen()
 
         # Make collision mesh height match height of original mesh; it might
         # end up being shorter. The origin of each object must be set to its center
@@ -692,6 +714,8 @@ def generate_slab_collision():
         # sibling and then delete it, since we no longer need it.
         reparent_children_to_grandparent(collision_ob)
         objects_to_delete.append(collision_ob)
+
+        repaint_screen()
 
     print("")
     deselect_all_objects()
@@ -873,6 +897,28 @@ def remove_all_uv_maps(ob):
 def ensure_object_mode():
     if bpy.context.active_object is not None and bpy.context.active_object.mode != 'OBJECT':
         bpy.ops.object.mode_set(mode='OBJECT')
+
+
+def focus_on_object(ob):
+    # Find the 3D view area
+    area3d = next((area for area in bpy.context.screen.areas if area.type == "VIEW_3D"), None)
+
+    if area3d:
+        # Find the 3D region within the 3D view area
+        region3d = next((region for region in area3d.regions if region.type == "WINDOW"), None)
+
+        if region3d:
+            # Override context for both area and region
+            with bpy.context.temp_override(area=area3d,
+                                           region=region3d):
+                ob.select_set(True)
+                bpy.ops.view3d.view_selected()
+                ob.select_set(False)
+
+
+def repaint_screen():
+    bpy.context.view_layer.update()
+    bpy.ops.wm.redraw_timer(type='DRAW_WIN_SWAP', iterations=1)
 
 
 def status_print(msg):
