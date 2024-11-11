@@ -21,9 +21,6 @@
 #   SM_BackStairwell_Roof_Gable_01
 #   SM_BackStairwell_Roof_Hole_01
 #   SM_BackStairwell_Roof_SegmentedSide_01
-#   SM_House_Roof_Main_Gable_01
-#   SM_House_Roof_Main_Side_01
-#   SM_House_Roof_Main_Side_02
 #
 # Live Home 3D adds a variable-length, random string of characters to the end of
 # every object during export. So, the raw export from Live Home 3D will contain
@@ -43,9 +40,6 @@
 #   SM_BackStairwell_Roof_Gable_01_0QTot$NVLAt9loQGf4NnNS
 #   SM_BackStairwell_Roof_Hole_01_1qfzoO5oP0TP7rkivGdnv5
 #   SM_BackStairwell_Roof_SegmentedSide_01_3aeIOLKYL9fOZSqIxV$Mkl
-#   SM_House_Roof_Main_Gable_01_3pBdtTXyfB0OJ19mch3Bj3
-#   SM_House_Roof_Main_Side_01_0ej0KfnaD95PJR96NuIZFJ
-#   SM_House_Roof_Main_Side_02_3CiZR4Rqj8z9PvTm60swBL
 #
 # This script will strip off those random characters and organize all the
 # pieces of the house into collections by room and element. For example, the
@@ -55,7 +49,6 @@
 #   - SM_BackPorch_Floor
 #   - SM_BackPorch_Wall_01
 #   - SM_BackStairwell_Roof
-#   - SM_House_Roof_Main
 #
 # This script will perform the following steps:
 #   1. Remove all objects that are not meshes (including parent objects).
@@ -114,7 +107,7 @@ element_regex_str = \
     r"|(?:Garden)?Window(?:_\d{2})?(?:_Opening)?" \
     r"|Door_\d{2}(?:_Opening)?" \
     r"|Opening(?:_\d{2})?))?" \
-    r"|WallPanel(?:_\d{2})?|Roof((?:_\d{2})|_Main)?" \
+    r"|WallPanel(?:_\d{2})?|Roof(?:_\d{2})?" \
     r"(?:_(?:Gable|Hole|Side|SegmentedSide|Vent)(?:_\d{2})?)?" \
     r"(?:_Window_\d{2}(?:_Opening)?)?" \
     r"|Post(?:_\d{2})?" \
