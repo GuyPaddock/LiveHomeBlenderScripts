@@ -81,8 +81,10 @@
 #      folder where the Blender project file has been saved.
 #
 # Dependencies:
-#   - Blender 4.0.
-#   - Object: Bool Tool plug-in enabled.
+#   - Blender 4.2+.
+#   - Object: Bool Tool (https://extensions.blender.org/add-ons/bool-tool/) plug-in enabled.
+#   - Convex Decomposition plug-in (https://github.com/olitheolix/blender-convex-decomposition)
+#     enabled.
 #
 # @author Guy Elsmore-Paddock <guy.paddock@gmail.com>
 # @author Aaron Powell <aaron@lunadigital.tv>
@@ -516,12 +518,18 @@ def generate_basic_collision():
         if o.type == 'MESH' and basic_collision_regex.match(o.name)
     ]
 
+    objects_to_delete = []
+
     for src_ob in collision_obs:
         status_print("  - Generating collision for '" + src_ob.name + "'...")
 
         deselect_all_objects()
 
-        collision_ob = create_collision_mesh_from(src_ob)
+        # Create a temporary object that represents a simpler, cleaner version of this object for
+        # generating collision. We carve holes in this simpler version for things like window and
+        # door frames. The result is typically a concave object, and collision meshes need to be
+        # convex; to fix that, we process it through a convex decomposition algorithm.
+        collision_ob = create_blank_copy_of(src_ob)
 
         make_convex_hull(collision_ob)
 
@@ -532,14 +540,19 @@ def generate_basic_collision():
 
         decompose_into_convex_parts(collision_ob)
 
-        # Uncomment this line if you don't want collision meshes to have any
-        # faces so that the model looks "neater" in Blender. It has no impact on
-        # collision calculation in UE4, but removing the faces makes it harder
-        # to customize the collision mesh before export.
-        # bpy.ops.mesh.delete(type="ONLY_FACE")
+        # Now, move all the convex parts of the collision object that are its children up to be its
+        # sibling and then delete it, since we no longer need it.
+        reparent_children_to_grandparent(collision_ob)
+        objects_to_delete.append(collision_ob)
 
     print("")
     deselect_all_objects()
+
+    for ob in objects_to_delete:
+        with bpy.context.temp_override(selected_objects=[ob], active_object=ob):
+            status_print(f"  - Deleting temporary object '{ob.name}'...")
+            bpy.ops.object.delete()
+
 
 
 def carve_openings_in_collision_mesh(collision_ob, openings):
@@ -574,6 +587,14 @@ def carve_openings_in_collision_mesh(collision_ob, openings):
         bpy.ops.object.modifier_apply(modifier="Auto Boolean")
         bpy.ops.object.boolean_auto_difference()
 
+        # Remesh the result, since boolean operations ruin topology.
+        bpy.ops.object.modifier_add(type='REMESH')
+        bpy.context.object.modifiers["Remesh"].mode = 'BLOCKS'
+        bpy.context.object.modifiers["Remesh"].octree_depth = 6
+        bpy.context.object.modifiers["Remesh"].scale = 0.990
+        bpy.context.object.modifiers["Remesh"].threshold = 1
+        bpy.ops.object.modifier_apply(modifier="Remesh")
+
         deselect_all_objects()
 
 
@@ -586,12 +607,14 @@ def generate_slab_collision():
         if o.type == 'MESH' and slab_collision_regex.match(o.name)
     ]
 
+    objects_to_delete = []
+
     for src_ob in slab_obs:
         print(f"  - Generating slab collision for '{src_ob.name}':")
 
         deselect_all_objects()
 
-        collision_ob = create_collision_mesh_from(src_ob)
+        collision_ob = create_blank_copy_of(src_ob)
 
         bpy.context.view_layer.objects.active = collision_ob
         bpy.ops.object.mode_set(mode='OBJECT')
@@ -665,25 +688,29 @@ def generate_slab_collision():
         print("    - Splitting collision mesh into convex pieces...")
         decompose_into_convex_parts(collision_ob)
 
-        # Uncomment this line if you don't want collision meshes to have any
-        # faces so that the model looks "neater" in Blender. It has no impact on
-        # collision calculation in UE4, but removing the faces makes it harder
-        # to customize the collision mesh before export.
-        # bpy.ops.mesh.delete(type="ONLY_FACE")
+        # Now, move all the convex parts of the collision object that are its children up to be its
+        # sibling and then delete it, since we no longer need it.
+        reparent_children_to_grandparent(collision_ob)
+        objects_to_delete.append(collision_ob)
 
     print("")
     deselect_all_objects()
 
+    for ob in objects_to_delete:
+        with bpy.context.temp_override(selected_objects=[ob], active_object=ob):
+            status_print(f"  - Deleting temporary object '{ob.name}'...")
+            bpy.ops.object.delete()
 
-def create_collision_mesh_from(src_ob):
-    collision_ob = create_inplace_copy_of(src_ob)
 
-    collision_ob.name = 'UCX_' + src_ob.name + "_01"
+def create_blank_copy_of(src_ob):
+    copy_ob = create_inplace_copy_of(src_ob)
 
-    remove_all_materials(collision_ob)
-    remove_all_uv_maps(collision_ob)
+    copy_ob.name = src_ob.name + "_blank"
 
-    return collision_ob
+    remove_all_materials(copy_ob)
+    remove_all_uv_maps(copy_ob)
+
+    return copy_ob
 
 
 def create_inplace_copy_of(src_ob):
@@ -701,6 +728,22 @@ def create_inplace_copy_of(src_ob):
         set_parent_collection(copy_ob, parent_collection.name)
 
     return copy_ob
+
+
+def reparent_children_to_grandparent(parent_ob, update_naming_convention=True):
+    grandparent_ob = parent_ob.parent
+
+    for child_ob in parent_ob.children:
+        child_ob.parent = grandparent_ob
+
+        # Shift coordinate system of child, so it doesn't get offset by new parent.
+        child_ob.matrix_parent_inverse = grandparent_ob.matrix_world.inverted()
+
+        if update_naming_convention:
+            print(f"Replacing '{parent_ob.name}' with '{grandparent_ob.name}' in '{child_ob.name}'...")
+            # Adjust the naming convention of the child so that it's named after the grandparent
+            # instead of the parent.
+            child_ob.name = child_ob.name.replace(parent_ob.name, grandparent_ob.name)
 
 
 def wall_openings_of(parent_ob):
@@ -755,48 +798,6 @@ def make_convex_hull(ob):
     deselect_all_objects()
 
 
-def convex_volume(*obs):
-    meshes = []
-    verts = []
-
-    for ob in obs:
-        mesh = ob.data
-        bm = bmesh.new()
-
-        bm.from_mesh(mesh)
-
-        bm.verts.ensure_lookup_table()
-        bm.edges.ensure_lookup_table()
-        bm.faces.ensure_lookup_table()
-
-        # Prevent early garbage collection.
-        meshes.append(bm)
-
-        geom = list(bm.verts) + list(bm.edges) + list(bm.faces)
-
-        for g in geom:
-            if hasattr(g, "verts"):
-                verts.extend(v.co for v in g.verts)
-            else:
-                verts.append(g.co)
-
-    return build_volume_from_verts(verts)
-
-
-def build_volume_from_verts(verts):
-    # Based on code from:
-    # https://blender.stackexchange.com/questions/107357/how-to-find-if-geometry-linked-to-an-edge-is-coplanar
-    origin = sum(verts, Vector((0, 0, 0))) / len(verts)
-    bm = bmesh.new()
-
-    for v in verts:
-        bm.verts.new(v - origin)
-
-    bmesh.ops.convex_hull(bm, input=bm.verts)
-
-    return bm.calc_volume()
-
-
 def deselect_all_objects():
     ensure_object_mode()
     bpy.ops.object.select_all(action='DESELECT')
@@ -848,69 +849,25 @@ def set_parent_collection(ob, collection_name):
 
 
 def remove_all_materials(ob):
-    for i in range(len(ob.material_slots)):
-        ob.active_material_index = i
-        bpy.ops.object.material_slot_remove()
+    with bpy.context.temp_override(active_object=ob):
+        ob.select_set(True)
+        bpy.context.view_layer.objects.active = ob
+
+        for i in range(len(ob.material_slots)):
+            ob.active_material_index = i
+            bpy.ops.object.material_slot_remove()
 
 
 def remove_all_uv_maps(ob):
-    uv_layers = ob.data.uv_layers
-    uv_layers_to_remove = uv_layers[:]
+    with bpy.context.temp_override(active_object=ob):
+        ob.select_set(True)
+        bpy.context.view_layer.objects.active = ob
 
-    while uv_layers_to_remove:
-        uv_layers.remove(uv_layers_to_remove.pop())
+        uv_layers = ob.data.uv_layers
+        uv_layers_to_remove = uv_layers[:]
 
-
-def rename_pieces(object_name, name_skiplist=None):
-    if name_skiplist is None:
-        name_skiplist = []
-
-    for duplicate_name, old_index_str, new_index in dupe_name_sequence(object_name, name_skiplist):
-        piece = bpy.data.objects.get(duplicate_name)
-
-        if not piece:
-            break
-
-        old_name = piece.name
-        new_name = re.sub(fr"(?:01)?\.{old_index_str}$", f"{new_index:02d}", piece.name)
-
-        if old_name != new_name:
-            print(f"Renaming piece '{old_name}' to '{new_name}'.")
-            piece.name = new_name
-
-
-def name_duplicates_of(ob):
-    duplicates = []
-
-    for duplicate_name, _, _ in dupe_name_sequence(ob.name):
-        piece = bpy.data.objects.get(duplicate_name)
-
-        if not piece:
-            break
-        else:
-            duplicates.append(piece)
-
-    return duplicates
-
-
-def dupe_name_sequence(base_name, skiplist=None):
-    if skiplist is None:
-        skiplist = []
-
-    yield base_name, "", 1
-
-    new_index = 1
-
-    for old_name_index in count(start=1):
-        old_index_str = f"{old_name_index:03d}"
-        duplicate_name = f"{base_name}.{old_index_str}"
-
-        if duplicate_name in skiplist:
-            continue
-        else:
-            new_index = new_index + 1
-
-            yield duplicate_name, old_index_str, new_index
+        while uv_layers_to_remove:
+            uv_layers.remove(uv_layers_to_remove.pop())
 
 
 def ensure_object_mode():
@@ -924,145 +881,20 @@ def status_print(msg):
     sys.stdout.flush()
 
 
-def decompose_into_convex_parts(ob, max_iterations=5, volume_threshold=0.01):
+def decompose_into_convex_parts(ob):
     """
-    Decompose an object into convex parts using convex hulls and boolean operations.
+    Decompose an object into convex parts using the "Convex Decomposition" add-on.
 
     :param ob: The input object to decompose.
-    :param max_iterations: The maximum number of decomposition iterations.
-    :param volume_threshold: Minimum volume threshold to consider a part.
     """
     ob.select_set(True)
     bpy.context.view_layer.objects.active = ob
 
-    for i in range(max_iterations):
-        if is_convex(ob):
-            # Stop if the object is already convex.
-            print(f"  - {ob.name} is already convex.")
-            break
-
-        convex_hull = create_convex_hull(ob)
-        convex_hull.name = f"{ob.name}_convex_part_{i}"
-
-        boundary_faces = identify_boundary_faces(ob, convex_hull)
-        if not boundary_faces:
-            # No more boundary faces to split on.
-            break
-
-        new_part = split_object(ob, boundary_faces)
-        new_part.name = f"{ob.name}_part_{i}"
-
-        if convex_volume(new_part) < volume_threshold:
-            bpy.data.objects.remove(new_part)
-            continue
-
-    print(f"  - Convex decomposition of {ob.name} is complete.")
-
-
-def is_convex(ob):
-    """Check if the object is convex by verifying no internal faces violate convexity."""
-    bm = bmesh.new()
-    bm.from_mesh(ob.data)
-    bm.faces.ensure_lookup_table()
-
-    threshold_angle = math.radians(180)
-
-    # Convex if no angles exceed the threshold.
-    result = True
-
-    for edge in bm.edges:
-        linked_faces = edge.link_faces
-        if len(linked_faces) == 2:  # Only consider pairs of adjacent faces
-            angle = angle_between_face_normals(linked_faces[0], linked_faces[1])
-
-            # Concave if angle exceeds threshold
-            if angle > threshold_angle:
-                result = False
-                break
-
-    bm.free()
-
-    return result
-
-
-def angle_between_face_normals(face1, face2):
-    """
-    Calculate the angle in radians between the normals of two given faces.
-
-    Args:
-        face1 (bmesh.types.BMFace): The first face.
-        face2 (bmesh.types.BMFace): The second face.
-
-    Returns:
-        float: The angle in radians between the two face normals.
-    """
-    normal1 = face1.normal
-    normal2 = face2.normal
-
-    if normal1.length == 0 or normal2.length == 0:
-      result = 0
-    else:
-      result = normal1.angle(normal2)
-
-    return result
-
-
-def create_convex_hull(ob):
-    """Create and return a convex hull object around the provided object."""
-    bpy.ops.object.mode_set(mode='OBJECT')
-    ob.select_set(True)
-    bpy.ops.object.duplicate()
-    convex_hull = bpy.context.active_object
-    bpy.ops.object.mode_set(mode='EDIT')
-    bpy.ops.mesh.convex_hull()
-    bpy.ops.object.mode_set(mode='OBJECT')
-
-    return convex_hull
-
-
-def identify_boundary_faces(ob, convex_hull, max_convex_deviation=0.001):
-    """
-    Identify boundary faces between an object and its convex hull,
-    which can serve as split points for decomposition.
-    """
-    boundary_faces = []
-    bm = bmesh.new()
-    bm.from_mesh(ob.data)
-    bm.faces.ensure_lookup_table()
-
-    for face in bm.faces:
-        face_center = face.calc_center_median()
-
-        # Unpack the return values from closest_point_on_mesh
-        found, closest_point, normal, index = convex_hull.closest_point_on_mesh(face_center)
-
-        if found:
-            closest_point_vector = closest_point
-
-            # Calculate the distance
-            distance = (face_center - closest_point_vector).length
-
-            if distance > max_convex_deviation:
-                boundary_faces.append(face)
-
-    bm.free()
-    return boundary_faces
-
-
-def split_object(ob, boundary_faces):
-    """
-    Split the object using identified boundary faces. Creates a new object from the split part.
-    """
-    bpy.ops.object.mode_set(mode='EDIT')
-    bpy.ops.mesh.select_all(action='DESELECT')
-
-    for face in boundary_faces:
-        face.select = True
-
-    bpy.ops.mesh.separate(type='SELECTED')
-    bpy.ops.object.mode_set(mode='OBJECT')
-
-    return bpy.context.selected_objects[-1]  # Return new part after split
+    bpy.context.scene.ConvDecompProperties.transparency = 50
+    bpy.context.scene.ConvDecompProperties.hull_collection_name = ""
+    bpy.context.scene.ConvDecompProperties.solver = 'CoACD'
+    bpy.context.scene.ConvDecompPropertiesCoACD.f_threshold = 0.05
+    bpy.ops.opr.convex_decomposition_run()
 
 
 clear_file()
