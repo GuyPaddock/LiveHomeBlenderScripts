@@ -687,10 +687,9 @@ def generate_slab_collision():
         bpy.ops.object.modifier_apply(modifier="Decimate")
         repaint_screen()
 
-        # Make collision mesh height match height of original mesh; it might
-        # end up being shorter. The origin of each object must be set to its center
-        # for this to work properly; otherwise, it's scaling relative to the world
-        # origin.
+        # Make collision mesh height match height of original mesh; it might end up being shorter.
+        # The origin of each object must be set to its center for this to work properly; otherwise,
+        # it's scaling relative to the world origin.
         translate_origin_to_midpoint(src_ob)
         translate_origin_to_midpoint(collision_ob)
 
@@ -741,7 +740,7 @@ def create_inplace_copy_of(src_ob):
     copy_ob.show_wire = True
     copy_ob.parent = src_ob
 
-    # Shift coordinate system of child, so it doesn't get offset by parent
+    # Shift coordinate system of child, so it doesn't get offset by parent.
     copy_ob.matrix_parent_inverse = src_ob.matrix_world.inverted()
 
     if src_ob.users_collection:
