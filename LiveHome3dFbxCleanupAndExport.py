@@ -565,7 +565,6 @@ def generate_basic_collision():
             bpy.ops.object.delete()
 
 
-
 def carve_openings_in_collision_mesh(collision_ob, openings):
     deselect_all_objects()
 
@@ -835,6 +834,7 @@ def clear_file():
         bpy.data.collections.remove(collection)
 
     bpy.ops.outliner.orphans_purge()
+
 
 def remove_collection_by_name_if_empty(collection_name):
     if (collection_name in bpy.data.collections and
