@@ -120,9 +120,9 @@ element_regex_str = \
     r"|Post(?:_\d{2})?" \
     r"|Stairs(?:_Opening)?" \
     r"|Conduit" \
-    r"|Tub_Shelf)))?(?P<Garbage>.*)$"
+    r"|Tub_Shelf))(?:_Placeholder(?:_\d{2})?)?)?(?P<Garbage>.*)$"
 
-unwanted_element_regex_str = r"^.+((_(Door|Window)_\d{2})|(Ladder.*))$"
+unwanted_element_regex_str = r"^.+((_(Door|Window)_\d{2})|(Placeholder.*))$"
 
 prefix_regex_str = \
     r"^(?P<Prefix>(?:Closet_)?(?:Conduit(?:_\d{2})?_)?" \
