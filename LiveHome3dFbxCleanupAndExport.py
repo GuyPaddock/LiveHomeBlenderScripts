@@ -293,7 +293,9 @@ def group_objects_by_room_and_type():
                         prefixes.append(element_prefix)
 
             if garbage is not None:
-                ob.name = ob.name.replace(garbage, '')
+                new_name = ob.name.replace(garbage, '')
+                print(f"  - Trimming garbage in name '{ob.name}' to '{new_name}'.")
+                ob.name = new_name
 
     for ob in [o for o in bpy.data.objects if o.type == 'MESH']:
         for prefix in prefixes:
