@@ -827,6 +827,7 @@ def deselect_all_objects():
 
 def clear_file():
     # Clear all objects from the scene
+    ensure_object_mode()
     bpy.ops.object.select_all(action='SELECT')
     bpy.ops.object.delete()
 
