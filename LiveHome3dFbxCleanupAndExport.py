@@ -120,6 +120,8 @@ element_regex_str = \
     r"|Conduit" \
     r"|Tub_Shelf)))?(?P<Garbage>.*)$"
 
+unwanted_element_regex_str = r"^.+((_(Door|Window)_\d{2})|(Ladder.*))$"
+
 prefix_regex_str = \
     r"^(?P<Prefix>(?:Closet_)?(?:Conduit(?:_\d{2})?_)?" \
     r"(?:CeilingTrim|Ceiling|Floor|Post|Roof|Slab|StairWall|Stairs|Tub_Shelf" \
@@ -132,6 +134,7 @@ wall_opening_regex_str = r"^$NAME$_(?:(Door|Window)_[0-9]{2}_)?Opening(?:_[0-9]{
 floor_opening_regex_str = r"^.+_Stairs_Opening$"
 
 element_regex = re.compile(element_regex_str)
+unwanted_element_regex = re.compile(unwanted_element_regex_str)
 prefix_regex = re.compile(prefix_regex_str)
 
 basic_collision_regex = re.compile(basic_collision_regex_str)
@@ -148,9 +151,10 @@ def cleanup_scene():
     print("")
     print("=== Cleaning up the scene ===")
 
-    remove_unwanted_objects()
+    remove_unwanted_objects_by_type()
     assign_slab_names()
     group_objects_by_room_and_type()
+    remove_unwanted_objects_by_name()
     translate_origin_of_all_objects_to_world_origin()
     simplify_geometry()
 
@@ -202,7 +206,7 @@ def export_all_collections_to_fbx():
     print("")
 
 
-def remove_unwanted_objects():
+def remove_unwanted_objects_by_type():
     print("Removing unwanted, non-mesh objects...")
 
     meshes = [o for o in bpy.data.objects if o.type == 'MESH']
@@ -300,6 +304,19 @@ def group_objects_by_room_and_type():
                 ob.name = ob.name.replace('SM_', '')
 
                 set_parent_collection(ob, prefix)
+
+
+def remove_unwanted_objects_by_name():
+    print("Removing unwanted objects by name...")
+
+    unwanted_objects = [o for o in bpy.data.objects
+                        if unwanted_element_regex.match(o.name)]
+
+    for ob in unwanted_objects:
+        print(f"  - Deleting '{ob.name}' (type '{ob.type}').")
+
+    with bpy.context.temp_override(selected_objects=unwanted_objects):
+        bpy.ops.object.delete()
 
 
 def translate_origin_to_midpoint(ob):
