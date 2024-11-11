@@ -216,10 +216,10 @@ def remove_unwanted_objects_by_type():
     non_meshes = [o for o in bpy.data.objects if o.type != 'MESH']
 
     for ob in meshes:
-        print("  - Keeping '" + ob.name + "' (type '" + ob.type + "').")
+        print(f"  - Keeping '{ob.name}' (type '{ob.type}').")
 
     for ob in non_meshes:
-        print("  - Deleting '" + ob.name + "' (type '" + ob.type + "').")
+        print(f"  - Deleting '{ob.name}' (type '{ob.type}').")
 
     # Remove the link between the meshes and their parents before we remove the
     # unwanted parent objects.
@@ -289,9 +289,7 @@ def group_objects_by_room_and_type():
                     ])
 
                     if element_prefix not in prefixes:
-                        print(
-                            f"  - Creating collection prefix '{element_prefix}'."
-                        )
+                        print(f"  - Creating collection prefix '{element_prefix}'.")
                         prefixes.append(element_prefix)
 
             if garbage is not None:
@@ -300,9 +298,7 @@ def group_objects_by_room_and_type():
     for ob in [o for o in bpy.data.objects if o.type == 'MESH']:
         for prefix in prefixes:
             if ob.name.startswith(prefix):
-                print(
-                    f"  - Adding '{ob.name}' to collection prefix '{prefix}'."
-                )
+                print(f"  - Adding '{ob.name}' to collection prefix '{prefix}'.")
 
                 # Remove static mesh prefix since it moved up to the collection
                 # and filename.
@@ -350,6 +346,7 @@ def translate_origin_of_all_objects_to_world_origin():
     n = len(obs)
     assert n
 
+    print("  - Calculating center of the scene...")
     cursor = bpy.context.scene.cursor
     cursor.location = sum([o.matrix_world.translation for o in obs], Vector()) / n
     cursor.location.z = 0
@@ -357,7 +354,7 @@ def translate_origin_of_all_objects_to_world_origin():
     # Move objects back to origin of scene
     for ob in bpy.data.objects:
         if bpy.data.objects.get(ob.name):
-            status_print("  - Adjusting origin of '" + ob.name + "'...")
+            status_print(f"  - Adjusting location of '{ob.name}' relative to cursor...")
 
             bpy.context.view_layer.objects.active = ob
 
@@ -379,6 +376,7 @@ def translate_origin_of_all_objects_to_world_origin():
 
     for ob in bpy.data.objects:
         bpy.context.view_layer.objects.active = ob
+        status_print(f"  - Shifting origin of '{ob.name}' to world center using the cursor...")
         bpy.ops.object.origin_set(type='ORIGIN_CURSOR', center='MEDIAN')
 
     repaint_screen()
@@ -388,7 +386,7 @@ def simplify_geometry():
     print("Simplifying model geometry...")
 
     for ob in [o for o in bpy.data.objects if o.type == 'MESH']:
-        status_print("  - Simplifying '" + ob.name + "'...")
+        status_print(f"  - Simplifying '{ob.name}'...")
 
         deselect_all_objects()
 
@@ -495,7 +493,7 @@ def apply_uv_grid():
         )
 
         for ob in [o for o in bpy.data.objects if o.type == 'MESH']:
-            status_print("  - Applying UV grid to '" + ob.name + "'...")
+            status_print(f"  - Applying UV grid to '{ob.name}'...")
 
             if len(ob.data.materials) != 0:
                 ob.data.materials[0] = mat
@@ -529,7 +527,7 @@ def generate_basic_collision():
     objects_to_delete = []
 
     for src_ob in collision_obs:
-        status_print("  - Generating collision for '" + src_ob.name + "'...")
+        status_print(f"  - Generating collision for '{src_ob.name}'...")
 
         deselect_all_objects()
 
