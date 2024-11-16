@@ -297,8 +297,7 @@ def group_objects_by_room_and_type():
             if ob.name.startswith(prefix):
                 print(f"  - Adding '{ob.name}' to collection prefix '{prefix}'.")
 
-                # Remove static mesh prefix since it moved up to the collection
-                # and filename.
+                # Remove static mesh prefix since it moved up to the collection and filename.
                 ob.name = ob.name.replace('SM_', '')
 
                 set_parent_collection(ob, prefix)
