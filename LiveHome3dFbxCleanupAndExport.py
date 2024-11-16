@@ -182,17 +182,17 @@ def export_all_collections_to_fbx():
         # Select only objects in the current collection.
         deselect_all_objects()
 
-        for obj in coll.all_objects:
-            obj.select_set(True)
-
         try:
             bpy.ops.export_scene.fbx(
                 filepath=str(Path(bpy.data.filepath).parent / f"{coll.name}.fbx"),
-                use_selection=True,
-                mesh_smooth_type='FACE',
+                check_existing=False,
+                collection=coll.name,
+                object_types={'MESH'},
+                use_mesh_modifiers=False,
+                mesh_smooth_type='EDGE',
                 use_tspace=True,
-                bake_space_transform=True,
-                check_existing=False
+                add_leaf_bones=False,
+                bake_anim=False,
             )
 
         except RuntimeError:
