@@ -124,7 +124,7 @@ prefix_regex_str = \
     r"(?:CeilingTrim|Ceiling|Floor|Post|Roof|Slab|StairWall|Stairs|Tub_Shelf" \
     r"|WallPanel|Wall)(?:_\d{2})?)"
 
-basic_collision_regex_str = r"^.+_(?:(?:Wall|Post|StairWall|.*PorchCeiling)(?:_\d{2})?)$"
+basic_collision_regex_str = r"^.+_(?:(?:Wall|Post|StairWall|Ceiling|Roof(?:_\d{2})?_(?:Segmented)?(Side|Gable))(?:_\d{2})?)$"
 slab_collision_regex_str = r"^House_Floor_\d{2}_Slab$"
 
 wall_opening_regex_str = r"^$NAME$_(?:(Door|Window)_[0-9]{2}_)?Opening(?:_[0-9]{2})?$"
