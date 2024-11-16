@@ -461,17 +461,15 @@ def apply_uv_grid():
 
     image_name = "UV Grid"
 
-    # Call the operator
+    # Create the UV grid image.
     bpy.ops.image.new(
         name=image_name,
         width=1024,
         height=1024,
         color=(0.0, 0.0, 0.0, 1.0),
         alpha=True,
-        generated_type='UV_GRID',  # BLANK, COLOR_GRID
-        float=False,
-        use_stereo_3d=False,
-        tiled=False
+        generated_type='UV_GRID',
+        float=False
     )
 
     image = bpy.data.images.get(image_name)
@@ -479,7 +477,11 @@ def apply_uv_grid():
     if image:
         mat = bpy.data.materials.new(name="UV Grid")
         mat.use_nodes = True
-        bsdf = mat.node_tree.nodes["Principled BSDF"]
+
+        bsdf = mat.node_tree.nodes.get("Principled BSDF")
+
+        if not bsdf:
+            bsdf = mat.node_tree.nodes.new('ShaderNodeBsdfPrincipled')
 
         tex_image = mat.node_tree.nodes.new('ShaderNodeTexImage')
         tex_image.image = image
@@ -492,21 +494,22 @@ def apply_uv_grid():
         for ob in [o for o in bpy.data.objects if o.type == 'MESH']:
             status_print(f"  - Applying UV grid to '{ob.name}'...")
 
-            if len(ob.data.materials) != 0:
-                ob.data.materials[0] = mat
-            else:
+            if len(ob.data.materials) == 0:
                 ob.data.materials.append(mat)
+            else:
+                ob.data.materials[0] = mat
+
+            ob.data.update()
 
             deselect_all_objects()
             ob.select_set(True)
             bpy.context.view_layer.objects.active = ob
 
+            # Assign material and select all faces
             bpy.ops.object.mode_set(mode='EDIT')
-            bpy.context.tool_settings.mesh_select_mode = [False, False, True]
             bpy.ops.mesh.select_all(action='SELECT')
-
-            ob.active_material_index = 0
             bpy.ops.object.material_slot_assign()
+            bpy.ops.object.mode_set(mode='OBJECT')
 
         print("")
         repaint_screen()
