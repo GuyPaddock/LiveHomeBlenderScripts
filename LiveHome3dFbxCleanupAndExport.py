@@ -700,7 +700,10 @@ def generate_slab_collision():
             openings=floor_openings()
         )
 
-        print("    - Splitting collision mesh into convex pieces...")
+        # Now scale to only 20% height so that the slab lines up with the visible geometry.
+        scale_object_from_center(collision_ob, (1, 1, 0.2))
+
+        # print("    - Splitting collision mesh into convex pieces...")
         decompose_into_convex_parts(collision_ob)
 
         # Now, move all the convex parts of the collision object that are its children up to be its
@@ -718,6 +721,26 @@ def generate_slab_collision():
             status_print(f"  - Deleting temporary object '{ob.name}'...")
             bpy.ops.object.delete()
 
+
+def scale_object_from_center(ob, scale):
+    ensure_object_mode()
+    deselect_all_objects()
+
+    ob.select_set(True)
+    bpy.context.view_layer.objects.active = ob
+
+    # Move origin to the center of the object, to scale relative to that point.
+    bpy.ops.object.origin_set(type='ORIGIN_CENTER_OF_VOLUME', center='MEDIAN')
+
+    # Actually scale it.
+    bpy.ops.transform.resize(value=scale)
+    bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
+
+    # Move origin to the center of the scene.
+    bpy.context.scene.cursor.location = Vector((0.0, 0.0, 0.0))
+    bpy.ops.object.origin_set(type='ORIGIN_CURSOR', center='MEDIAN')
+
+    deselect_all_objects()
 
 def create_blank_copy_of(src_ob):
     copy_ob = create_inplace_copy_of(src_ob)
