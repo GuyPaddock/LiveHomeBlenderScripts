@@ -602,9 +602,10 @@ def carve_openings_in_collision_mesh(collision_ob, openings):
 
         # Remesh the result, since boolean operations ruin topology.
         bpy.ops.object.modifier_add(type='REMESH')
-        bpy.context.object.modifiers["Remesh"].mode = 'BLOCKS'
-        bpy.context.object.modifiers["Remesh"].octree_depth = 6
-        bpy.context.object.modifiers["Remesh"].scale = 0.990
+        bpy.context.object.modifiers["Remesh"].mode = 'SHARP'
+        bpy.context.object.modifiers["Remesh"].octree_depth = 8
+        bpy.context.object.modifiers["Remesh"].scale = 0.9
+        bpy.context.object.modifiers["Remesh"].sharpness = 1
         bpy.context.object.modifiers["Remesh"].threshold = 1
         bpy.ops.object.modifier_apply(modifier="Remesh")
 
@@ -634,57 +635,19 @@ def generate_slab_collision():
         collision_ob = create_blank_copy_of(src_ob)
 
         bpy.context.view_layer.objects.active = collision_ob
-        bpy.ops.object.mode_set(mode='OBJECT')
 
-        print("    - Filling in open faces (top and bottom) of collision mesh...")
-        bpy.ops.object.mode_set(mode='EDIT')
-        bpy.ops.mesh.decimate(ratio=0.4, vertex_group_factor=1)
-        bpy.context.tool_settings.mesh_select_mode = [True, False, False]
-        bpy.ops.mesh.select_all(action='SELECT')
+        ensure_object_mode()
 
-        try:
-            # One or both of these can fail depending on the geometry.
-            print("    - Filling in collision mesh (pass 1 of 2)...")
-            bpy.ops.mesh.edge_face_add()
-
-            print("    - Filling in collision mesh (pass 2 of 2); this may fail without penalty...")
-            bpy.ops.mesh.edge_face_add()
-        except:
-            pass
-
-        bpy.ops.object.mode_set(mode='OBJECT')
-
-        print("    - Rebuilding collision mesh geometry (pass 1 of 2)...")
-        # Rebuild the slab with the Remesh modifier to eliminate
-        # artifacts/errors in the mesh from Live Home
+        print("    - Rebuilding collision mesh geometry...")
+        # Rebuild the slab with the Remesh modifier to eliminate artifacts/errors in the mesh from
+        # Live Home
         bpy.ops.object.modifier_add(type='REMESH')
-        bpy.context.object.modifiers["Remesh"].mode = 'SHARP'
-        bpy.context.object.modifiers["Remesh"].octree_depth = 8
-        bpy.context.object.modifiers["Remesh"].scale = 0.785
-        bpy.context.object.modifiers["Remesh"].sharpness = 1
-        bpy.context.object.modifiers["Remesh"].threshold = 1
-        bpy.context.object.modifiers["Remesh"].use_smooth_shade = True
-        bpy.ops.object.modifier_apply(modifier="Remesh")
-
-        print("    - Rebuilding collision mesh geometry (pass 2 of 2)...")
-        # Use a second Remesh pass to eliminate artifacts introduced or
-        # exacerbated by the prior pass.
-        bpy.ops.object.modifier_add(type='REMESH')
-        bpy.context.object.modifiers["Remesh"].mode = 'SHARP'
-        bpy.context.object.modifiers["Remesh"].octree_depth = 8
+        bpy.context.object.modifiers["Remesh"].mode = 'BLOCKS'
+        bpy.context.object.modifiers["Remesh"].octree_depth = 10
         bpy.context.object.modifiers["Remesh"].scale = 0.990
-        bpy.context.object.modifiers["Remesh"].sharpness = 1
         bpy.context.object.modifiers["Remesh"].threshold = 1
         bpy.context.object.modifiers["Remesh"].use_smooth_shade = True
         bpy.ops.object.modifier_apply(modifier="Remesh")
-        repaint_screen()
-
-        print("    - Simplifying faces of collision mesh geometry...")
-        # Simplify the slab collision; this typically can reduce the mesh from
-        # more than 70,000 faces to fewer than 64 faces.
-        bpy.ops.object.modifier_add(type='DECIMATE')
-        bpy.context.object.modifiers["Decimate"].decimate_type = 'DISSOLVE'
-        bpy.ops.object.modifier_apply(modifier="Decimate")
         repaint_screen()
 
         # Make collision mesh height match height of original mesh; it might end up being shorter.
@@ -704,7 +667,7 @@ def generate_slab_collision():
         )
 
         # Now scale to only 20% height so that the slab lines up with the visible geometry.
-        scale_object_from_center(collision_ob, (1, 1, 0.2))
+        #scale_object_from_center(collision_ob, (1, 1, 0.2))
 
         # print("    - Splitting collision mesh into convex pieces...")
         decompose_into_convex_parts(collision_ob)
@@ -960,7 +923,7 @@ def decompose_into_convex_parts(ob):
     bpy.context.scene.ConvDecompProperties.transparency = 50
     bpy.context.scene.ConvDecompProperties.hull_collection_name = ""
     bpy.context.scene.ConvDecompProperties.solver = 'CoACD'
-    bpy.context.scene.ConvDecompPropertiesCoACD.f_threshold = 0.05
+    bpy.context.scene.ConvDecompPropertiesCoACD.f_threshold = 0.025
     bpy.ops.opr.convex_decomposition_run()
 
 
