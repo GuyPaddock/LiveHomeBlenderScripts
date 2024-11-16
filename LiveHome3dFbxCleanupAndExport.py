@@ -931,7 +931,7 @@ clear_file()
 import_fbx(fbx_path)
 cleanup_scene()
 setup_uvs()
-# apply_uv_grid()
+apply_uv_grid()
 generate_collision()
 export_all_collections_to_fbx()
 
