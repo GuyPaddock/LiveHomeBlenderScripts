@@ -521,8 +521,6 @@ def generate_basic_collision():
         if o.type == 'MESH' and basic_collision_regex.match(o.name)
     ]
 
-    objects_to_delete = []
-
     for src_ob in collision_obs:
         status_print(f"  - Generating collision for '{src_ob.name}'...")
 
@@ -549,17 +547,12 @@ def generate_basic_collision():
         # Now, move all the convex parts of the collision object that are its children up to be its
         # sibling and then delete it, since we no longer need it.
         reparent_children_to_grandparent(collision_ob)
-        objects_to_delete.append(collision_ob)
+        delete_object(collision_ob)
 
         repaint_screen()
 
     print("")
     deselect_all_objects()
-
-    for ob in objects_to_delete:
-        with bpy.context.temp_override(selected_objects=[ob], active_object=ob):
-            status_print(f"  - Deleting temporary object '{ob.name}'...")
-            bpy.ops.object.delete()
 
 
 def carve_openings_in_collision_mesh(collision_ob, openings):
@@ -641,8 +634,6 @@ def generate_roof_collision():
         if o.type == 'MESH' and roof_collision_regex.match(o.name)
     ]
 
-    objects_to_delete = []
-
     for src_ob in roof_obs:
         print(f"  - Generating roof collision for '{src_ob.name}':")
 
@@ -659,17 +650,12 @@ def generate_roof_collision():
         # Now, move all the convex parts of the collision object that are its children up to be its
         # sibling and then delete it, since we no longer need it.
         reparent_children_to_grandparent(collision_ob)
-        objects_to_delete.append(collision_ob)
+        delete_object(collision_ob)
 
         repaint_screen()
 
     print("")
     deselect_all_objects()
-
-    for ob in objects_to_delete:
-        with bpy.context.temp_override(selected_objects=[ob], active_object=ob):
-            status_print(f"  - Deleting temporary object '{ob.name}'...")
-            bpy.ops.object.delete()
 
 
 def generate_slab_collision():
@@ -680,8 +666,6 @@ def generate_slab_collision():
         o for o in bpy.data.objects
         if o.type == 'MESH' and slab_collision_regex.match(o.name)
     ]
-
-    objects_to_delete = []
 
     for src_ob in slab_obs:
         print(f"  - Generating slab collision for '{src_ob.name}':")
@@ -724,17 +708,12 @@ def generate_slab_collision():
         # Now, move all the convex parts of the collision object that are its children up to be its
         # sibling and then delete it, since we no longer need it.
         reparent_children_to_grandparent(collision_ob)
-        objects_to_delete.append(collision_ob)
+        delete_object(collision_ob)
 
         repaint_screen()
 
     print("")
     deselect_all_objects()
-
-    for ob in objects_to_delete:
-        with bpy.context.temp_override(selected_objects=[ob], active_object=ob):
-            status_print(f"  - Deleting temporary object '{ob.name}'...")
-            bpy.ops.object.delete()
 
 
 def scale_object_from_center(ob, scale):
@@ -799,6 +778,11 @@ def reparent_children_to_grandparent(parent_ob, update_naming_convention=True):
             # Adjust the naming convention of the child so that it's named after the grandparent
             # instead of the parent.
             child_ob.name = child_ob.name.replace(parent_ob.name, grandparent_ob.name)
+
+
+def delete_object(ob):
+    with bpy.context.temp_override(selected_objects=[ob], active_object=ob):
+        bpy.ops.object.delete()
 
 
 def wall_openings_of(parent_ob):
