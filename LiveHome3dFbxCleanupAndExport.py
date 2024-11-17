@@ -674,9 +674,6 @@ def generate_slab_collision():
             openings=floor_openings()
         )
 
-        # Now scale to only 20% height so that the slab lines up with the visible geometry.
-        #scale_object_from_center(collision_ob, (1, 1, 0.2))
-
         # print("    - Splitting collision mesh into convex pieces...")
         decompose_into_convex_parts(collision_ob)
 
