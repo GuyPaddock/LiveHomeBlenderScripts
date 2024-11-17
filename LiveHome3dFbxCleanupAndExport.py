@@ -377,7 +377,7 @@ def simplify_geometry():
     print("Simplifying model geometry...")
 
     for ob in [o for o in bpy.data.objects if o.type == 'MESH']:
-        status_print(f"  - Simplifying '{ob.name}'...")
+        print(f"  - Simplifying '{ob.name}'...")
 
         deselect_all_objects()
 
