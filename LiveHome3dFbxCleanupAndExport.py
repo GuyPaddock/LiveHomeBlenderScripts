@@ -997,6 +997,19 @@ def focus_on_object(ob):
                 ob.select_set(False)
 
 
+def repaint_screen_and_pause(pause_sec=5):
+    """
+    Repaints the screen and then pauses for the specified amount of time, to give the user a
+    preview of what's happening.
+
+    :param pause_sec: An optional amount of time to pause. Defaults to 5 seconds.
+    """
+    import time
+
+    repaint_screen()
+    time.sleep(pause_sec)
+
+
 def repaint_screen():
     bpy.context.view_layer.update()
     bpy.ops.wm.redraw_timer(type='DRAW_WIN_SWAP', iterations=1)
