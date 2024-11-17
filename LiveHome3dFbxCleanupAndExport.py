@@ -119,7 +119,8 @@ prefix_regex_str = \
     r"(?:CeilingTrim|Ceiling|Floor|Post|Roof|Slab|StairWall|Stairs|Tub_Shelf" \
     r"|WallPanel|Wall)(?:_\d{2})?)"
 
-basic_collision_regex_str = r"^.+_(?:(?:Wall|Post|StairWall|Ceiling|Roof(?:_\d{2})?_(?:Segmented)?(Side|Gable))(?:_\d{2})?)$"
+basic_collision_regex_str = r"^.+_(?:(?:Wall|Post|StairWall|Ceiling|Roof(?:_\d{2})?_Gable)(?:_\d{2})?)$"
+roof_collision_regex_str = r"^.+_(?:Roof(?:_\d{2})?_(?:Segmented)?Side)(?:_\d{2})$"
 slab_collision_regex_str = r"^House_Floor_\d{2}_Slab$"
 
 wall_opening_regex_str = r"^$NAME$_(?:(Door|Window)_[0-9]{2}_)?Opening(?:_[0-9]{2})?$"
@@ -130,6 +131,7 @@ unwanted_element_regex = re.compile(unwanted_element_regex_str)
 prefix_regex = re.compile(prefix_regex_str)
 
 basic_collision_regex = re.compile(basic_collision_regex_str)
+roof_collision_regex = re.compile(roof_collision_regex_str)
 slab_collision_regex = re.compile(slab_collision_regex_str)
 
 floor_opening_regex = re.compile(floor_opening_regex_str)
@@ -163,6 +165,7 @@ def generate_collision():
     print("")
     print("=== Generating collision ===")
 
+    generate_roof_collision()
     generate_basic_collision()
     generate_slab_collision()
 
@@ -627,6 +630,47 @@ def carve_openings_in_collision_mesh(collision_ob, openings):
 
     deselect_all_objects()
     repaint_screen()
+
+
+def generate_roof_collision():
+    print("")
+    print("Generating collision for roofs...")
+
+    roof_obs = [
+        o for o in bpy.data.objects
+        if o.type == 'MESH' and roof_collision_regex.match(o.name)
+    ]
+
+    objects_to_delete = []
+
+    for src_ob in roof_obs:
+        print(f"  - Generating roof collision for '{src_ob.name}':")
+
+        deselect_all_objects()
+
+        focus_on_object(src_ob)
+        repaint_screen()
+
+        collision_ob = create_blank_copy_of(src_ob)
+
+        print("    - Splitting collision mesh into convex pieces...")
+        decompose_into_convex_parts(collision_ob)
+
+        # Now, move all the convex parts of the collision object that are its children up to be its
+        # sibling and then delete it, since we no longer need it.
+        reparent_children_to_grandparent(collision_ob)
+        objects_to_delete.append(collision_ob)
+
+        repaint_screen()
+
+    print("")
+    deselect_all_objects()
+
+    for ob in objects_to_delete:
+        with bpy.context.temp_override(selected_objects=[ob], active_object=ob):
+            status_print(f"  - Deleting temporary object '{ob.name}'...")
+            bpy.ops.object.delete()
+
 
 def generate_slab_collision():
     print("")
