@@ -775,19 +775,26 @@ def make_all_faces_convex(ob):
 
 def make_convex_hull(ob):
     deselect_all_objects()
+    ensure_object_mode()
 
     bpy.context.view_layer.objects.active = ob
     ob.select_set(True)
 
     bpy.ops.object.mode_set(mode='EDIT')
-
+    bpy.ops.mesh.select_mode(use_extend=False, use_expand=False, type='VERT')
     bpy.ops.mesh.select_all(action='SELECT')
-    bpy.ops.mesh.convex_hull()
+    bpy.ops.mesh.dissolve_limited()
+    bpy.ops.mesh.convex_hull(
+        delete_unused=True,
+        use_existing_faces=False,
+        join_triangles=True,
+        face_threshold=radians(30),
+        shape_threshold=radians(180))
 
     mesh = ob.data
     bm = bmesh.from_edit_mesh(mesh)
 
-    # Clean-up unnecessary edges
+    # Clean-up unnecessary edges.
     bmesh.ops.dissolve_limit(
         bm,
         angle_limit=radians(5),
