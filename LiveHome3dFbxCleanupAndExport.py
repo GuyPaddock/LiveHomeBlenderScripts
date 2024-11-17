@@ -526,7 +526,7 @@ def generate_basic_collision():
 
         deselect_all_objects()
 
-        focus_on_object(src_ob)
+        focus_on_object_in_viewport(src_ob)
         repaint_screen()
 
         # Create a temporary object that represents a simpler, cleaner version of this object for
@@ -561,7 +561,7 @@ def carve_openings_in_collision_mesh(collision_ob, openings):
     subtraction_objects = []
 
     for opening in openings:
-        focus_on_object(opening)
+        focus_on_object_in_viewport(opening)
         repaint_screen()
 
         subtraction_ob = create_inplace_copy_of(opening)
@@ -601,7 +601,7 @@ def carve_openings_in_collision_mesh(collision_ob, openings):
     # Capture the resulting joined object.
     subtraction_ob = bpy.context.view_layer.objects.active
 
-    focus_on_object(collision_ob)
+    focus_on_object_in_viewport(collision_ob)
 
     # Clean up any remaining artifacts in the subtraction mesh. The resolution used for the remesh
     # impacts how closely the collision meshes follows the contour of each opening in the collision
@@ -639,7 +639,7 @@ def generate_roof_collision():
 
         deselect_all_objects()
 
-        focus_on_object(src_ob)
+        focus_on_object_in_viewport(src_ob)
         repaint_screen()
 
         collision_ob = create_blank_copy_of(src_ob)
@@ -672,7 +672,7 @@ def generate_slab_collision():
 
         deselect_all_objects()
 
-        focus_on_object(src_ob)
+        focus_on_object_in_viewport(src_ob)
         repaint_screen()
 
         collision_ob = create_blank_copy_of(src_ob)
@@ -955,16 +955,16 @@ def ensure_object_mode():
         bpy.ops.object.mode_set(mode='OBJECT')
 
 
-def focus_on_object(ob):
-    # Find the 3D view area
+def focus_on_object_in_viewport(ob):
+    # Find the 3D view area.
     area3d = next((area for area in bpy.context.screen.areas if area.type == "VIEW_3D"), None)
 
     if area3d:
-        # Find the 3D region within the 3D view area
+        # Find the 3D region within the 3D view area.
         region3d = next((region for region in area3d.regions if region.type == "WINDOW"), None)
 
         if region3d:
-            # Override context for both area and region
+            # Override context for both area and region.
             with bpy.context.temp_override(area=area3d,
                                            region=region3d):
                 space3d = area3d.spaces.active
@@ -979,6 +979,32 @@ def focus_on_object(ob):
                 bpy.ops.view3d.localview()
                 bpy.ops.view3d.view_selected()
                 ob.select_set(False)
+
+
+def center_scene_in_viewport():
+    # Find the 3D view area.
+    area3d = next((area for area in bpy.context.screen.areas if area.type == "VIEW_3D"), None)
+
+    if area3d:
+        # Find the 3D region within the 3D view area.
+        region3d = next((region for region in area3d.regions if region.type == "WINDOW"), None)
+
+        if region3d:
+            # Override context for both area and region.
+            with bpy.context.temp_override(area=area3d,
+                                           region=region3d):
+                space3d = area3d.spaces.active
+
+                # Toggle out of local view.
+                if space3d.local_view:
+                    bpy.ops.view3d.localview()
+
+                bpy.ops.view3d.view_all(use_all_regions=True)
+
+                for i in range(3):
+                    bpy.ops.view3d.zoom(delta=1)
+
+    repaint_screen()
 
 
 def repaint_screen_and_pause(pause_sec=5):
@@ -1022,11 +1048,19 @@ def decompose_into_convex_parts(ob):
 
 
 clear_file()
+
 import_fbx(fbx_path)
+center_scene_in_viewport()
+
 cleanup_scene()
+center_scene_in_viewport()
+
 setup_uvs()
 apply_uv_grid()
+
 generate_collision()
+center_scene_in_viewport()
+
 export_all_collections_to_fbx()
 
 print("Done!")
