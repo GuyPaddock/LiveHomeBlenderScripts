@@ -562,50 +562,71 @@ def generate_basic_collision():
 def carve_openings_in_collision_mesh(collision_ob, openings):
     deselect_all_objects()
 
+    subtraction_objects = []
+
     for opening in openings:
         focus_on_object(opening)
         repaint_screen()
 
-        subtraction_mesh = create_inplace_copy_of(opening)
+        subtraction_ob = create_inplace_copy_of(opening)
 
         # Make a solid object out of the opening.
-        make_convex_hull(subtraction_mesh)
+        make_convex_hull(subtraction_ob)
+        repaint_screen()
 
-        bpy.context.view_layer.objects.active = subtraction_mesh
-        subtraction_mesh.select_set(True)
+        bpy.context.view_layer.objects.active = subtraction_ob
+        subtraction_ob.select_set(True)
 
+        # Scale the subtraction object up by 15% so that it extends outside the collision object for
+        # boolean subtraction to work properly.
         bpy.ops.object.mode_set(mode='OBJECT')
         bpy.ops.object.modifier_add(type='SOLIDIFY')
-        bpy.context.object.modifiers["Solidify"].thickness = 0.1
+        bpy.context.object.modifiers["Solidify"].thickness = 0.15
         bpy.context.object.modifiers["Solidify"].offset = 0
-
         bpy.ops.object.modifier_apply(modifier="Solidify")
 
-        # Make the hollow center of the object solid.
-        make_convex_hull(subtraction_mesh)
+        repaint_screen()
 
-        deselect_all_objects()
+        # Make the hollow center of the subtraction object solid.
+        make_convex_hull(subtraction_ob)
 
-        bpy.context.view_layer.objects.active = collision_ob
-
-        subtraction_mesh.select_set(True)
-        collision_ob.select_set(True)
-
-        bpy.ops.object.modifier_apply(modifier="Auto Boolean")
-        bpy.ops.object.boolean_auto_difference()
-
-        # Remesh the result, since boolean operations ruin topology.
-        bpy.ops.object.modifier_add(type='REMESH')
-        bpy.context.object.modifiers["Remesh"].mode = 'SHARP'
-        bpy.context.object.modifiers["Remesh"].octree_depth = 8
-        bpy.context.object.modifiers["Remesh"].scale = 0.9
-        bpy.context.object.modifiers["Remesh"].sharpness = 1
-        bpy.context.object.modifiers["Remesh"].threshold = 1
-        bpy.ops.object.modifier_apply(modifier="Remesh")
+        subtraction_objects.append(subtraction_ob)
 
         deselect_all_objects()
         repaint_screen()
 
+    # Join the subtraction meshes into a single mesh, so we only have to carve the collision mesh
+    # once. This reduces the number of artifacts we introduce into the collision mesh.
+    for subtraction_ob in subtraction_objects:
+        subtraction_ob.select_set(True)
+
+    bpy.ops.object.join()
+
+    # Capture the resulting joined object.
+    subtraction_ob = bpy.context.view_layer.objects.active
+
+    focus_on_object(collision_ob)
+
+    # Clean up any remaining artifacts in the subtraction mesh. The resolution used for the remesh
+    # impacts how closely the collision meshes follows the contour of each opening in the collision
+    # mesh.
+    remesh_high_resolution(subtraction_ob)
+    repaint_screen()
+
+    deselect_all_objects()
+    bpy.context.view_layer.objects.active = collision_ob
+    subtraction_ob.select_set(True)
+    collision_ob.select_set(True)
+
+    bpy.ops.object.modifier_apply(modifier="Auto Boolean")
+    bpy.ops.object.boolean_auto_difference()
+    repaint_screen()
+
+    # Remesh the result, since boolean operations can ruin topology.
+    remesh_high_resolution(collision_ob)
+
+    deselect_all_objects()
+    repaint_screen()
 
 def generate_slab_collision():
     print("")
@@ -632,16 +653,9 @@ def generate_slab_collision():
 
         ensure_object_mode()
 
+        # Rebuild the slab with the Remesh modifier to eliminate artifacts/errors in the mesh from Live Home.
         print("    - Rebuilding collision mesh geometry...")
-        # Rebuild the slab with the Remesh modifier to eliminate artifacts/errors in the mesh from
-        # Live Home
-        bpy.ops.object.modifier_add(type='REMESH')
-        bpy.context.object.modifiers["Remesh"].mode = 'BLOCKS'
-        bpy.context.object.modifiers["Remesh"].octree_depth = 10
-        bpy.context.object.modifiers["Remesh"].scale = 0.990
-        bpy.context.object.modifiers["Remesh"].threshold = 1
-        bpy.context.object.modifiers["Remesh"].use_smooth_shade = True
-        bpy.ops.object.modifier_apply(modifier="Remesh")
+        remesh_very_high_resolution(collision_ob)
         repaint_screen()
 
         # Make collision mesh height match height of original mesh; it might end up being shorter.
@@ -762,6 +776,37 @@ def floor_openings():
         yield opening_ob
 
 
+def remesh_very_high_resolution(ob):
+    remesh(ob, resolution_passes=10, scale=0.990)
+
+
+def remesh_high_resolution(ob):
+    remesh(ob, resolution_passes=8, scale=0.990)
+
+
+def remesh_medium_resolution(ob):
+    remesh(ob, resolution_passes=6, scale=0.990)
+
+
+def remesh_low_resolution(ob):
+    remesh(ob, resolution_passes=4, scale=0.900)
+
+
+def remesh(ob, resolution_passes, scale):
+    deselect_all_objects()
+    bpy.context.view_layer.objects.active = ob
+    ob.select_set(True)
+
+    bpy.ops.object.modifier_add(type='REMESH')
+    bpy.context.object.modifiers["Remesh"].mode = 'BLOCKS'
+    bpy.context.object.modifiers["Remesh"].octree_depth = resolution_passes
+    bpy.context.object.modifiers["Remesh"].scale = scale
+    bpy.context.object.modifiers["Remesh"].threshold = 0.5
+    bpy.ops.object.modifier_apply(modifier="Remesh")
+
+    deselect_all_objects()
+
+
 def make_all_faces_convex(ob):
     bpy.context.view_layer.objects.active = ob
     bpy.ops.object.mode_set(mode='EDIT')
@@ -802,6 +847,7 @@ def make_convex_hull(ob):
         edges=bm.edges,
     )
 
+    ensure_object_mode()
     deselect_all_objects()
 
 
