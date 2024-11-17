@@ -736,6 +736,7 @@ def scale_object_from_center(ob, scale):
 
     deselect_all_objects()
 
+
 def create_blank_copy_of(src_ob):
     copy_ob = create_inplace_copy_of(src_ob)
 
