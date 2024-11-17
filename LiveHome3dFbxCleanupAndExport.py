@@ -1,9 +1,8 @@
 ##
-# This script can be run in Blender to re-arrange and clean-up an FBX model from
-# Live Home 3D Pro so that it's more suitable for use in Unreal Engine 4/5.
+# This script can be run in Blender to re-arrange and clean-up an FBX model from Live Home 3D Pro
+# so that it's more suitable for use in Unreal Engine 4/5.
 #
-# All objects in Live Home 3D should follow a naming convention similar to UE4
-# naming conventions:
+# All objects in Live Home 3D should follow a naming convention similar to UE4 naming conventions:
 #
 #   SM_<Room Name>_<Element Type>
 #
@@ -22,10 +21,9 @@
 #   SM_BackStairwell_Roof_Hole_01
 #   SM_BackStairwell_Roof_SegmentedSide_01
 #
-# Live Home 3D adds a variable-length, random string of characters to the end of
-# every object during export. So, the raw export from Live Home 3D will contain
-# objects with names like the following (and the random string changes during
-# each export):
+# Live Home 3D adds a variable-length, random string of characters to the end of every object during
+# export. So, the raw export from Live Home 3D will contain objects with names like the following
+# (and the random string changes during each export):
 #
 #   SM_BackPorch_Ceiling_0c_n7s8x13_eOFCzcBLIak
 #   SM_BackPorch_Floor_3oXO8swYvCdvboc6Q8Uv7T
@@ -41,10 +39,9 @@
 #   SM_BackStairwell_Roof_Hole_01_1qfzoO5oP0TP7rkivGdnv5
 #   SM_BackStairwell_Roof_SegmentedSide_01_3aeIOLKYL9fOZSqIxV$Mkl
 #
-# This script will strip off those random characters and organize all the
-# pieces of the house into collections by room and element. For example, the
-# following collections would be created from the objects listed in the example
-# above:
+# This script will strip off those random characters and organize all the pieces of the house into
+# collections by room and element. For example, the following collections would be created from the
+# objects listed in the example above:
 #   - SM_BackPorch_Ceiling
 #   - SM_BackPorch_Floor
 #   - SM_BackPorch_Wall_01
@@ -52,26 +49,26 @@
 #
 # This script will perform the following steps:
 #   1. Remove all objects that are not meshes (including parent objects).
-#   2. Fix-up the naming of "Slab" objects that Live Home 3D generates itself,
-#      since these objects cannot be renamed inside Live Home 3D itself.
+#   2. Fix-up the naming of "Slab" objects that Live Home 3D generates itself, since these objects
+#      cannot be renamed inside Live Home 3D itself.
 #   3. Organize objects into collections by room and element.
-#   4. Adjusts the position of the house model so that its center on the X and
-#      Y axes matches the origin of the world.
-#   5. Converts triangles to quads and eliminates split normals (in case there
-#      are any; generally this doesn't seem to be the case with LH3D exports).
-#   6. Generates a secondary UV map for UE4 lighting, so that UE does not
-#      encounter overlapping UVs during lightmap generation.
-#   7. Re-generates the primary UV map using cube projection so that the UVs are
-#      more reasonable and applying materials to walls in UE doesn't end up
-#      looking like a ransom note or hodgepodge of text pieces.
-#   8. (Optionally) Applies Blender's UV checkboard test pattern texture to all
-#      meshes so that it's easy to spot problems with the mesh UVs while in
-#      Blender.
-#   9. Generates basic convex hull collision for all posts, walls, and stairs.
-#  10. Generates complex collision for slabs (ceilings/floors) using remesh and
-#      a convex hull decomposition algorithm.
-#  11. Exports each collection of meshes as separate FBX files in the same
-#      folder where the Blender project file has been saved.
+#   4. Adjusts the position of the house model so that its center on the X and Y axes matches the
+#      origin of the world.
+#   5. Converts triangles to quads and eliminates split normals (in case there are any; generally
+#      this doesn't seem to be the case with LH3D exports).
+#   6. Generates a secondary UV map for UE4 lighting, so that UE does not encounter overlapping UVs
+#      during lightmap generation.
+#   7. Re-generates the primary UV map using cube projection so that the UVs are more reasonable and
+#      applying materials to walls in UE doesn't end up looking like a ransom note or hodgepodge of
+#      text pieces.
+#   8. (Optionally) Applies Blender's UV checkboard test pattern texture to all meshes so that it's
+#      easy to spot problems with the mesh UVs while in Blender.
+#   9. Generates basic convex hull collision for all posts, walls, and stairs using remesh and a
+#      convex hull decomposition algorithm.
+#  10. Generates complex collision for slabs (ceilings/floors) using remesh and a convex hull
+#      decomposition algorithm.
+#  11. Exports each collection of meshes as separate FBX files in the same folder where the Blender
+#      project file has been saved.
 #
 # Dependencies:
 #   - Blender 4.2+.
