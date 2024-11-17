@@ -983,7 +983,16 @@ def focus_on_object(ob):
             # Override context for both area and region
             with bpy.context.temp_override(area=area3d,
                                            region=region3d):
+                space3d = area3d.spaces.active
+
+                # Toggle out of local view.
+                if space3d.local_view:
+                    bpy.ops.view3d.localview()
+
                 ob.select_set(True)
+
+                # Toggle into local view.
+                bpy.ops.view3d.localview()
                 bpy.ops.view3d.view_selected()
                 ob.select_set(False)
 
