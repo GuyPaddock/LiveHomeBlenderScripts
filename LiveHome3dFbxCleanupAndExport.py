@@ -718,7 +718,7 @@ def generate_slab_collision():
             openings=floor_openings()
         )
 
-        # print("    - Splitting collision mesh into convex pieces...")
+        print("    - Splitting collision mesh into convex pieces...")
         decompose_into_convex_parts(collision_ob)
 
         # Now, move all the convex parts of the collision object that are its children up to be its
