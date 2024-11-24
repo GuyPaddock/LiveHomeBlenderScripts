@@ -376,6 +376,7 @@ def translate_origin_of_all_objects_to_world_origin():
 
     for ob in bpy.data.objects:
         bpy.context.view_layer.objects.active = ob
+
         status_print(f"  - Shifting origin of '{ob.name}' to world center using the cursor...")
         bpy.ops.object.origin_set(type='ORIGIN_CURSOR', center='MEDIAN')
 
