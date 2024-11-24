@@ -323,8 +323,8 @@ def translate_origin_to_midpoint(ob):
 
 
 def translate_origin_to_world_origin(ob):
-    bpy.context.view_layer.objects.active = ob
     ob.select_set(True)
+    bpy.context.view_layer.objects.active = ob
 
     bpy.ops.transform.translate(value=(0, 0, 0), orient_type='GLOBAL')
 
@@ -387,6 +387,7 @@ def simplify_geometry():
 
         deselect_all_objects()
 
+        ob.select_set(True)
         bpy.context.view_layer.objects.active = ob
 
         bpy.ops.object.mode_set(mode='EDIT')
@@ -436,8 +437,8 @@ def apply_uv_func(uv_map_name, func):
         status_print(f"  - Projecting {uv_map_name} for '{ob.name}'...")
 
         # From https://blender.stackexchange.com/a/120807
-        bpy.context.view_layer.objects.active = ob
         ob.select_set(True)
+        bpy.context.view_layer.objects.active = ob
 
         uv_map = ob.data.uv_layers.get(uv_map_name)
 
@@ -569,12 +570,12 @@ def carve_openings_in_collision_mesh(collision_ob, openings):
 
         subtraction_ob = create_inplace_copy_of(opening)
 
+        subtraction_ob.select_set(True)
+        bpy.context.view_layer.objects.active = subtraction_ob
+
         # Make a solid object out of the opening.
         make_convex_hull(subtraction_ob)
         repaint_screen()
-
-        bpy.context.view_layer.objects.active = subtraction_ob
-        subtraction_ob.select_set(True)
 
         # Scale the subtraction object up by 15% so that it extends outside the collision object for
         # boolean subtraction to work properly.
@@ -594,35 +595,40 @@ def carve_openings_in_collision_mesh(collision_ob, openings):
         deselect_all_objects()
         repaint_screen()
 
-    # Join the subtraction meshes into a single mesh, so we only have to carve the collision mesh
-    # once. This reduces the number of artifacts we introduce into the collision mesh.
-    for subtraction_ob in subtraction_objects:
+    if len(subtraction_objects) > 0:
+        for subtraction_ob in subtraction_objects:
+            subtraction_ob.select_set(True)
+
+        # Ensure we have a selection to avoid the warning, "Active object is not a selected mesh"
+        bpy.context.view_layer.objects.active = subtraction_objects[0]
+
+        if len(subtraction_objects) != 1:
+            # Join the subtraction meshes into a single mesh, so we only have to carve the collision
+            # mesh once. This reduces the number of artifacts we introduce into the collision mesh.
+            bpy.ops.object.join()
+
+        # Capture the resulting joined object.
+        subtraction_ob = bpy.context.view_layer.objects.active
+
+        focus_on_object_in_viewport(collision_ob)
+
+        # Clean up any remaining artifacts in the subtraction mesh. The resolution used for the
+        # remesh impacts how closely the collision meshes follows the contour of each opening in the
+        # collision mesh.
+        remesh_high_resolution(subtraction_ob)
+        repaint_screen()
+
+        deselect_all_objects()
         subtraction_ob.select_set(True)
+        collision_ob.select_set(True)
+        bpy.context.view_layer.objects.active = collision_ob
 
-    bpy.ops.object.join()
+        bpy.ops.object.modifier_apply(modifier="Auto Boolean")
+        bpy.ops.object.boolean_auto_difference()
+        repaint_screen()
 
-    # Capture the resulting joined object.
-    subtraction_ob = bpy.context.view_layer.objects.active
-
-    focus_on_object_in_viewport(collision_ob)
-
-    # Clean up any remaining artifacts in the subtraction mesh. The resolution used for the remesh
-    # impacts how closely the collision meshes follows the contour of each opening in the collision
-    # mesh.
-    remesh_high_resolution(subtraction_ob)
-    repaint_screen()
-
-    deselect_all_objects()
-    bpy.context.view_layer.objects.active = collision_ob
-    subtraction_ob.select_set(True)
-    collision_ob.select_set(True)
-
-    bpy.ops.object.modifier_apply(modifier="Auto Boolean")
-    bpy.ops.object.boolean_auto_difference()
-    repaint_screen()
-
-    # Remesh the result, since boolean operations can ruin topology.
-    remesh_high_resolution(collision_ob)
+        # Remesh the result, since boolean operations can ruin topology.
+        remesh_high_resolution(collision_ob)
 
     deselect_all_objects()
     repaint_screen()
@@ -823,8 +829,8 @@ def remesh_low_resolution(ob):
 
 def remesh(ob, resolution_passes, scale):
     deselect_all_objects()
-    bpy.context.view_layer.objects.active = ob
     ob.select_set(True)
+    bpy.context.view_layer.objects.active = ob
 
     bpy.ops.object.modifier_add(type='REMESH')
     bpy.context.object.modifiers["Remesh"].mode = 'BLOCKS'
@@ -837,6 +843,7 @@ def remesh(ob, resolution_passes, scale):
 
 
 def make_all_faces_convex(ob):
+    ob.select_set(True)
     bpy.context.view_layer.objects.active = ob
     bpy.ops.object.mode_set(mode='EDIT')
 
@@ -851,8 +858,8 @@ def make_convex_hull(ob):
     deselect_all_objects()
     ensure_object_mode()
 
-    bpy.context.view_layer.objects.active = ob
     ob.select_set(True)
+    bpy.context.view_layer.objects.active = ob
 
     bpy.ops.object.mode_set(mode='EDIT')
     bpy.ops.mesh.select_mode(use_extend=False, use_expand=False, type='VERT')
