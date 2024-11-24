@@ -598,19 +598,9 @@ def carve_openings_in_collision_mesh(collision_ob, openings):
         repaint_screen()
 
     if len(subtraction_objects) > 0:
-        for subtraction_ob in subtraction_objects:
-            subtraction_ob.select_set(True)
-
-        # Ensure we have a selection to avoid the warning, "Active object is not a selected mesh"
-        bpy.context.view_layer.objects.active = subtraction_objects[0]
-
-        if len(subtraction_objects) != 1:
-            # Join the subtraction meshes into a single mesh, so we only have to carve the collision
-            # mesh once. This reduces the number of artifacts we introduce into the collision mesh.
-            bpy.ops.object.join()
-
-        # Capture the resulting joined object.
-        subtraction_ob = bpy.context.view_layer.objects.active
+        # Join the subtraction meshes into a single mesh, so we only have to carve the collision
+        # mesh once. This reduces the number of artifacts we introduce into the collision mesh.
+        subtraction_ob = join_objects(subtraction_objects)
 
         focus_on_object_in_viewport(collision_ob)
 
@@ -790,6 +780,37 @@ def reparent_children_to_grandparent(parent_ob, update_naming_convention=True):
             # Adjust the naming convention of the child so that it's named after the grandparent
             # instead of the parent.
             child_ob.name = child_ob.name.replace(parent_ob.name, grandparent_ob.name)
+
+
+def join_objects(objects):
+    """
+    Joins multiple objects into a single object, then returns the result.
+
+    If an empty list of objects are passed in, None is returned.
+    If a list containing only a single object is passed in, that object is returned.
+
+    :param objects: The list of objects to join.
+    :return: Either the joined object; or, None if no objects were provided.
+    """
+    if len(objects) == 0:
+        return None
+
+    if len(objects) == 1:
+        return objects[0]
+
+    for ob in objects:
+        # Mark object for joining.
+        ob.select_set(True)
+
+    # Ensure we have a selection to avoid the warning, "Active object is not a selected mesh"
+    bpy.context.view_layer.objects.active = objects[0]
+
+    bpy.ops.object.join()
+
+    # Capture the resulting joined object.
+    joined_ob = bpy.context.view_layer.objects.active
+
+    return joined_ob
 
 
 def delete_object(ob):
