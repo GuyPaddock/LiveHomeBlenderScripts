@@ -565,9 +565,6 @@ def carve_openings_in_collision_mesh(collision_ob, openings):
     subtraction_objects = []
 
     for opening in openings:
-        focus_on_object_in_viewport(opening)
-        repaint_screen()
-
         subtraction_ob = create_inplace_copy_of(opening)
 
         subtraction_ob.select_set(True)
