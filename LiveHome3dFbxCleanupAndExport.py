@@ -934,7 +934,7 @@ def remesh_high_resolution(ob):
 
 
 def remesh_medium_resolution(ob):
-    remesh(ob, resolution_passes=7, scale=0.990)
+    remesh(ob, resolution_passes=8, scale=0.900)
 
 
 def remesh_low_resolution(ob):
@@ -1168,7 +1168,7 @@ def decompose_into_convex_parts(ob):
     bpy.context.scene.ConvDecompProperties.transparency = 50
     bpy.context.scene.ConvDecompProperties.hull_collection_name = ""
     bpy.context.scene.ConvDecompProperties.solver = 'CoACD'
-    bpy.context.scene.ConvDecompPropertiesCoACD.f_threshold = 0.03
+    bpy.context.scene.ConvDecompPropertiesCoACD.f_threshold = 0.025
     bpy.ops.opr.convex_decomposition_run()
 
 
