@@ -573,6 +573,11 @@ def carve_openings_in_collision_mesh(collision_ob, openings):
         subtraction_ob.select_set(True)
         bpy.context.view_layer.objects.active = subtraction_ob
 
+        # Eliminate excess faces before making the convex hull.
+        bpy.ops.object.mode_set(mode='EDIT')
+        bpy.ops.mesh.dissolve_limited()
+        bpy.ops.object.mode_set(mode='OBJECT')
+
         # Make a solid object out of the opening.
         make_convex_hull(subtraction_ob)
         repaint_screen()
@@ -864,13 +869,11 @@ def make_convex_hull(ob):
     bpy.ops.object.mode_set(mode='EDIT')
     bpy.ops.mesh.select_mode(use_extend=False, use_expand=False, type='VERT')
     bpy.ops.mesh.select_all(action='SELECT')
-    bpy.ops.mesh.dissolve_limited()
+
     bpy.ops.mesh.convex_hull(
         delete_unused=True,
         use_existing_faces=False,
-        join_triangles=True,
-        face_threshold=radians(30),
-        shape_threshold=radians(180))
+        join_triangles=True)
 
     mesh = ob.data
     bm = bmesh.from_edit_mesh(mesh)
