@@ -87,6 +87,7 @@ import sys
 import time
 
 from collections import OrderedDict
+from itertools import count
 from math import radians
 from mathutils import Vector
 from pathlib import Path
@@ -119,6 +120,8 @@ prefix_regex_str = \
     r"(?:CeilingTrim|Ceiling|Floor|Post|Roof|Slab|StairWall|Stairs|Tub_Shelf" \
     r"|WallPanel|Wall)(?:_\d{2})?)"
 
+continuous_uv_regex_str = r"^.+_(?:(?:Ceiling|Floor|Wall|StairWall|Roof(?:_\d{2})?_Gable)(?:_\d{2})?)$"
+
 # Ceilings are in this list because the player might jump up in a low area (e.g., a porch).
 # Meanwhile, roof gables are handled like walls, so they're in the basic collision list. The rest of
 # a roof can be handled in a much simpler way since it can't have openings for doors and windows.
@@ -132,6 +135,8 @@ floor_opening_regex_str = r"^.+_Stairs_Opening$"
 element_regex = re.compile(element_regex_str)
 unwanted_element_regex = re.compile(unwanted_element_regex_str)
 prefix_regex = re.compile(prefix_regex_str)
+
+continuous_uv_regex = re.compile(continuous_uv_regex_str)
 
 basic_collision_regex = re.compile(basic_collision_regex_str)
 roof_collision_regex = re.compile(roof_collision_regex_str)
@@ -403,18 +408,92 @@ def simplify_geometry():
 
 
 def generate_diffuse_uvs():
-    print("Cube-projecting new UVs on each mesh...")
+    """
+    Generates UVs for texturing (diffuse color) in Unreal Engine using cube projection.
 
+    Prior to cube projection, objects for which UVs need to be continuous with those of their
+    neighbors (e.g., walls, floors, ceilings, etc.) are joined into a single object. Once cube
+    projection is complete, these objects are then split back into discrete objects that are placed
+    back into their original collections. Blender doesn't have a native ability to retain this
+     information, so this method relies on stashing the information in vertex groups.
+    """
     uv_map_name = 'DiffuseUV'
 
-    # deselect all to make sure select one at a time
+    print("Generating primary UV for UE texturing on each mesh...")
+
     deselect_all_objects()
 
+    # Find and join all objects requiring continuous UVs into a single object temporarily, so we can
+    # project UVs that line up across adjacent objects.
+    continuous_uv_objects = [
+        o for o in bpy.data.objects
+        if o.type == 'MESH' and continuous_uv_regex.match(o.name)
+    ]
+
+    continuous_uv_object_names_and_collections = [
+        (ob.name, ob.users_collection[0].name) for ob in continuous_uv_objects
+    ]
+
+    print("  - Joining objects together for cube-projection of new UVs...")
+    joined_ob = join_objects(continuous_uv_objects)
+
+    # When multiple objects get joined, the new joined object takes on the name of the first object.
+    # After the cube projection, we need to break up the joined object and restore the names, so we
+    # need to rename the joined object.
+    joined_ob_name = "temp_joined_continuous_objects"
+    joined_ob.name = joined_ob_name
+
+    # Project UVs onto all objects, including the continuous-UV ones.
+    print("  - Cube-projecting new UVs on all objects...")
+    deselect_all_objects()
     apply_uv_func(uv_map_name, box_uv_project)
+
+    # Now, separate the walls back into separate objects so we can generate collection.
+    # Each object name was used as a vertex group name before the objects were joined.
+    for (object_name, collection_name) in continuous_uv_object_names_and_collections:
+        status_print(f"  - Splitting vertex group '{object_name}' back out to object...")
+        vertex_group = joined_ob.vertex_groups.get(object_name)
+
+        if not vertex_group:
+            raise KeyError(f"Could not locate vertex group: {object_name}")
+
+        deselect_all_objects()
+        joined_ob.select_set(True)
+
+        bpy.ops.object.mode_set(mode='EDIT')
+
+        # Select vertices belonging to this vertex group.
+        joined_ob.vertex_groups.active = vertex_group
+
+        # Deselect any vertices previously selected, then select ONLY this group's vertices.
+        bpy.ops.mesh.select_all(action='DESELECT')
+        bpy.ops.object.vertex_group_select()
+
+        # Split the selection into a new object.
+        bpy.ops.mesh.separate(type='SELECTED')
+        bpy.ops.object.mode_set(mode='OBJECT')
+
+        # Refresh the joined object (which is the active object) and grab the newly created object,
+        # which is selected but not the active object.
+        joined_ob = bpy.context.view_layer.objects.active
+        split_ob = [ob for ob in bpy.context.selected_objects if ob.name != joined_ob.name][0]
+
+        # Rename the new object back to its old name, then put it back in its old collection.
+        split_ob.name = object_name
+        set_parent_collection(split_ob, collection_name)
+
+        # Remove all vertex groups from the new object
+        for vertex_group_name_to_remove in split_ob.vertex_groups.keys():
+            split_ob.vertex_groups.remove(split_ob.vertex_groups[vertex_group_name_to_remove])
+
+    # Delete the temporary, joined object that is now empty.
+    delete_object(joined_ob)
+
+    print("")
 
 
 def generate_lightmap_uvs():
-    print("Generating secondary UV for UE4 lightmaps on each mesh...")
+    print("Generating secondary UV for UE light maps on each mesh...")
 
     uv_map_name = 'Lightmap'
 
@@ -425,7 +504,7 @@ def generate_lightmap_uvs():
 
 
 def box_uv_project():
-    bpy.ops.uv.cube_project(cube_size=0.5)
+    bpy.ops.uv.cube_project(cube_size=1)
 
 
 def smart_uv_project():
@@ -801,6 +880,20 @@ def join_objects(objects):
     for ob in objects:
         # Mark object for joining.
         ob.select_set(True)
+
+        # Retain original object name by stashing it in a vertex group associated with the
+        # appropriate vertices.
+        bpy.context.view_layer.objects.active = ob
+        bpy.ops.object.mode_set(mode='EDIT')
+        bpy.ops.object.vertex_group_add()
+
+        ob.vertex_groups[-1].name = ob.name
+
+        bpy.ops.mesh.select_mode(use_extend=False, use_expand=False, type='VERT')
+        bpy.ops.mesh.select_all(action='SELECT')
+        bpy.ops.object.vertex_group_assign()
+
+        bpy.ops.object.mode_set(mode='OBJECT')
 
     # Ensure we have a selection to avoid the warning, "Active object is not a selected mesh"
     bpy.context.view_layer.objects.active = objects[0]
