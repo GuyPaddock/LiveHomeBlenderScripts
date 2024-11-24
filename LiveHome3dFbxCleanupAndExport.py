@@ -165,8 +165,8 @@ def cleanup_scene():
 def setup_uvs():
     # NOTE: If Blender crashes when running this, make sure you are running
     # Blender 2.91.2 or later; it fixes https://developer.blender.org/T85253.
-    generate_lightmap_uvs()
     generate_diffuse_uvs()
+    generate_lightmap_uvs()
 
 
 def generate_collision():
