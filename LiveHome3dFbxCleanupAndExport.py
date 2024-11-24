@@ -886,6 +886,8 @@ def make_convex_hull(ob):
         edges=bm.edges,
     )
 
+    bm.free()
+
     ensure_object_mode()
     deselect_all_objects()
 
