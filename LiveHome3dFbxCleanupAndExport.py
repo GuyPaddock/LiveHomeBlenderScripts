@@ -119,8 +119,11 @@ prefix_regex_str = \
     r"(?:CeilingTrim|Ceiling|Floor|Post|Roof|Slab|StairWall|Stairs|Tub_Shelf" \
     r"|WallPanel|Wall)(?:_\d{2})?)"
 
-basic_collision_regex_str = r"^.+_(?:(?:Wall|Post|StairWall|Ceiling|Roof(?:_\d{2})?_Gable)(?:_\d{2})?)$"
-roof_collision_regex_str = r"^.+_(?:Roof(?:_\d{2})?_(?:Segmented)?Side)(?:_\d{2})$"
+# Ceilings are in this list because the player might jump up in a low area (e.g., a porch).
+# Meanwhile, roof gables are handled like walls, so they're in the basic collision list. The rest of
+# a roof can be handled in a much simpler way since it can't have openings for doors and windows.
+basic_collision_regex_str = r"^.+_(?:(?:Wall|Post|StairWall|Roof(?:_\d{2})?_Gable)(?:_\d{2})?)$"
+roof_collision_regex_str = r"^.+_(?:Ceiling|(?:Roof(?:_\d{2})?_(?:Segmented)?Side)(?:_\d{2}))$"
 slab_collision_regex_str = r"^House_Floor_\d{2}_Slab$"
 
 wall_opening_regex_str = r"^$NAME$_(?:(Door|Window)_[0-9]{2}_)?Opening(?:_[0-9]{2})?$"
