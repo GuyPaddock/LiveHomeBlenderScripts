@@ -87,7 +87,6 @@ import sys
 import time
 
 from collections import OrderedDict
-from itertools import count
 from math import radians
 from mathutils import Vector
 from pathlib import Path
