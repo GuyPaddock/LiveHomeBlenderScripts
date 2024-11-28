@@ -160,7 +160,6 @@ def cleanup_scene():
     remove_unwanted_objects_by_name()
     translate_origin_of_all_objects_to_world_origin()
     simplify_geometry()
-    shade_all_objects_flat()
 
 
 def setup_uvs():
@@ -1200,6 +1199,7 @@ center_scene_in_viewport()
 cleanup_scene()
 center_scene_in_viewport()
 
+shade_all_objects_flat()
 setup_uvs()
 apply_uv_grid()
 
