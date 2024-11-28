@@ -160,6 +160,7 @@ def cleanup_scene():
     remove_unwanted_objects_by_name()
     translate_origin_of_all_objects_to_world_origin()
     simplify_geometry()
+    shade_all_objects_flat()
 
 
 def setup_uvs():
@@ -400,6 +401,24 @@ def simplify_geometry():
         bpy.ops.mesh.tris_convert_to_quads()
         bpy.ops.mesh.remove_doubles()
         bpy.ops.mesh.customdata_custom_splitnormals_clear()
+
+    print("")
+    deselect_all_objects()
+    repaint_screen()
+
+
+def shade_all_objects_flat():
+    print("Changing shading of all models to 'Flat'...")
+
+    for ob in [o for o in bpy.data.objects if o.type == 'MESH']:
+        print(f"  - Changing shading of '{ob.name}'...")
+
+        deselect_all_objects()
+
+        ob.select_set(True)
+        bpy.context.view_layer.objects.active = ob
+
+        bpy.ops.object.shade_flat()
 
     print("")
     deselect_all_objects()
