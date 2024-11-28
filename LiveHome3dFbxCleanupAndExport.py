@@ -555,63 +555,118 @@ def apply_uv_func(uv_map_name, func):
     print("")
 
 
-def apply_uv_grid():
-    print("Applying UV grid test pattern to each mesh...")
-
+def create_uv_grid_material(material_name):
+    """Create a material with a UV grid texture."""
     image_name = "UV Grid"
 
-    # Create the UV grid image.
-    bpy.ops.image.new(
-        name=image_name,
-        width=1024,
-        height=1024,
-        color=(0.0, 0.0, 0.0, 1.0),
-        alpha=True,
-        generated_type='UV_GRID',
-        float=False
-    )
-
-    image = bpy.data.images.get(image_name)
-
-    if image:
-        mat = bpy.data.materials.new(name="UV Grid")
-        mat.use_nodes = True
-
-        bsdf = mat.node_tree.nodes.get("Principled BSDF")
-
-        if not bsdf:
-            bsdf = mat.node_tree.nodes.new('ShaderNodeBsdfPrincipled')
-
-        tex_image = mat.node_tree.nodes.new('ShaderNodeTexImage')
-        tex_image.image = image
-
-        mat.node_tree.links.new(
-            bsdf.inputs['Base Color'],
-            tex_image.outputs['Color']
+    # Create the UV grid image if it doesn't already exist.
+    if not bpy.data.images.get(image_name):
+        bpy.ops.image.new(
+            name=image_name,
+            width=1024,
+            height=1024,
+            color=(0.0, 0.0, 0.0, 1.0),
+            alpha=True,
+            generated_type='UV_GRID',
+            float=False
         )
 
-        for ob in [o for o in bpy.data.objects if o.type == 'MESH']:
-            status_print(f"  - Applying UV grid to '{ob.name}'...")
+    image = bpy.data.images.get(image_name)
+    mat = bpy.data.materials.new(name=material_name)
+    mat.use_nodes = True
 
-            if len(ob.data.materials) == 0:
-                ob.data.materials.append(mat)
-            else:
-                ob.data.materials[0] = mat
+    bsdf = mat.node_tree.nodes.get("Principled BSDF")
+    if not bsdf:
+        bsdf = mat.node_tree.nodes.new('ShaderNodeBsdfPrincipled')
 
-            ob.data.update()
+    tex_image = mat.node_tree.nodes.new('ShaderNodeTexImage')
+    tex_image.image = image
 
-            deselect_all_objects()
-            ob.select_set(True)
-            bpy.context.view_layer.objects.active = ob
+    mat.node_tree.links.new(
+        bsdf.inputs['Base Color'],
+        tex_image.outputs['Color']
+    )
 
-            # Assign material and select all faces
-            bpy.ops.object.mode_set(mode='EDIT')
-            bpy.ops.mesh.select_all(action='SELECT')
-            bpy.ops.object.material_slot_assign()
-            bpy.ops.object.mode_set(mode='OBJECT')
+    return mat
 
-        print("")
-        repaint_screen()
+def get_or_create_uv_grid_material(material_name, ob):
+    """Gets or creates a material with a UV grid and adds it to the object."""
+    mat = bpy.data.materials.get(material_name)
+
+    if mat is None:
+        mat = create_uv_grid_material(material_name)
+
+    if mat.name not in [slot.name for slot in ob.data.materials]:
+        ob.data.materials.append(mat)
+
+    return ob.data.materials.keys().index(mat.name)
+
+def assign_uv_grid_materials_by_object_face_normals(ob, angle_threshold=5):
+    """Assigns unique instances of the UV grid material to faces based on their normal angles."""
+
+    # Ensure the object has data to manipulate.
+    if not ob.data.polygons:
+        print("    - Warning: No faces found in the selected object.")
+        return
+
+    # Remove all existing material slots from the object.
+    while ob.data.materials:
+        ob.data.materials.pop(index=0)
+
+    # Create a bmesh for easier face manipulation.
+    bm = bmesh.new()
+    bm.from_mesh(ob.data)
+
+    # Normalize face normals and group faces by normal angles.
+    bm.faces.ensure_lookup_table()
+    grouped_faces = {}
+
+    for face in bm.faces:
+        face_normal = face.normal.normalized().freeze()
+        matched_group = None
+
+        if face_normal.length == 0:
+            print(f"    - Warning: Face {face.index} has a zero-length normal and will be skipped.")
+            continue
+
+        for group_normal in grouped_faces.keys():
+            if face_normal.angle(group_normal) <= radians(angle_threshold):
+                matched_group = group_normal
+                break
+
+        if matched_group is not None:
+            grouped_faces[matched_group].append(face)
+        else:
+            grouped_faces[face_normal] = [face]
+
+    # Assign unique UV grid materials to each group
+    for idx, (normal, faces) in enumerate(grouped_faces.items(), start=1):
+        mat_name = f"UV_Grid_{idx:03}"
+        mat_index = get_or_create_uv_grid_material(mat_name, ob)
+
+        for face in faces:
+            face.material_index = mat_index
+
+    # Write back the changes to the mesh
+    bm.to_mesh(ob.data)
+    bm.free()
+    print(f"    - {ob.name}: Assigned {len(grouped_faces)} unique materials based on face normals.")
+
+
+def assign_unique_materials_by_face_normals():
+    print("Applying UV grid test pattern to each mesh...")
+
+    for ob in [o for o in bpy.data.objects if o.type == 'MESH']:
+        print(f"  - Applying UV grid to '{ob.name}'...")
+
+        deselect_all_objects()
+        ob.select_set(True)
+        bpy.context.view_layer.objects.active = ob
+
+        assign_uv_grid_materials_by_object_face_normals(ob)
+
+    print("")
+    repaint_screen()
 
 
 def generate_basic_collision():
@@ -1203,7 +1258,7 @@ center_scene_in_viewport()
 
 shade_all_objects_flat()
 setup_uvs()
-apply_uv_grid()
+assign_unique_materials_by_face_normals()
 
 generate_collision()
 center_scene_in_viewport()
