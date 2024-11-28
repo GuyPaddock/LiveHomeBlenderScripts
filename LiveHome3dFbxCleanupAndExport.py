@@ -120,7 +120,9 @@ prefix_regex_str = \
     r"(?:CeilingTrim|Ceiling|Floor|Post|Roof|Slab|StairWall|Stairs|Tub_Shelf" \
     r"|WallPanel|Wall)(?:_\d{2})?)"
 
-continuous_uv_regex_str = r"^.+_(?:(?:Wall|StairWall|Roof(?:_\d{2})?_(Gable|Side|SegmentedSide)|Ceiling|Floor)(?:_\d{2})?)$"
+# All elements matched by this regex are UV-mapped as though they were a single object. Slabs are included in this
+# pattern because the sides of slabs need to line up with exterior walls.
+continuous_uv_regex_str = r"^.+_(?:(?:Wall|StairWall|Roof(?:_\d{2})?_(Gable|Side|SegmentedSide)|Ceiling|Floor|Slab)(?:_\d{2})?)$"
 
 # Ceilings are in this list because the player might jump up in a low area (e.g., a porch).
 # Meanwhile, roof gables are handled like walls, so they're in the basic collision list. The rest of
