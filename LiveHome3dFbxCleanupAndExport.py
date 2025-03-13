@@ -722,6 +722,8 @@ def carve_openings_in_collision_mesh(collision_ob, openings):
     subtraction_objects = []
 
     for opening in openings:
+        print(f"    - Carving opening of '{opening.name}'...")
+
         subtraction_ob = create_inplace_copy_of(opening)
 
         subtraction_ob.select_set(True)
