@@ -96,7 +96,7 @@ fbx_path = r"C:\PATH\TO\SWEET_HOME\Export.fbx"
 element_regex_str = \
     r"^SM_(?P<Room>(?:[^_]+))_(?P<Element>(?:(?:(?:Conduit(?:_\d{2})?_)?" \
     r"(?:Closet_)?)(?:CeilingTrim" \
-    r"|Ceiling" \
+    r"|Ceiling(?:_\d{2})?" \
     r"|Floor(?:_\d{2}(?:_Slab)?)?" \
     r"|(?:Stair)?Wall_\d{2}(?:_(?:(?:Moulding_(?:Base|Crown)_(?:Left|Right))" \
     r"|(?:Garden)?Window(?:_\d{2})?(?:_Opening)?" \
@@ -106,7 +106,7 @@ element_regex_str = \
     r"(?:_(?:Gable|Hole|Side|SegmentedSide|Vent)(?:_\d{2})?)?" \
     r"(?:_Window_\d{2}(?:_Opening)?)?" \
     r"|Post(?:_\d{2})?" \
-    r"|Stairs(?:_Opening)?" \
+    r"|Stairs(?:_Opening)?(?:_\d{2})?" \
     r"|Conduit" \
     r"|Tub_Shelf))(?:_Placeholder(?:_\d{2})?)?)?(?P<Garbage>.*)$"
 
@@ -136,7 +136,7 @@ roof_collision_regex_str = r"^.+_(?:Ceiling|(?:Roof(?:_\d{2})?_(?:Segmented)?Sid
 slab_collision_regex_str = r"^House_Floor_\d{2}_Slab$"
 
 wall_opening_regex_str = r"^$NAME$_(?:(Door|Window)_[0-9]{2}_)?Opening(?:_[0-9]{2})?$"
-floor_opening_regex_str = r"^.+_Stairs_Opening$"
+floor_opening_regex_str = r"^.+_Stairs_Opening(?:_\d{2})?$"
 
 element_regex = re.compile(element_regex_str)
 unwanted_element_regex = re.compile(unwanted_element_regex_str)
