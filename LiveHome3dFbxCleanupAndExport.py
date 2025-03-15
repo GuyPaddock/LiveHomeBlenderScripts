@@ -89,6 +89,7 @@ import time
 from collections import OrderedDict
 from math import radians
 from mathutils import Vector
+from mathutils.bvhtree import BVHTree
 from pathlib import Path
 
 fbx_path = r"C:\PATH\TO\SWEET_HOME\Export.fbx"
@@ -859,7 +860,7 @@ def generate_slab_collision():
 
         carve_openings_in_collision_mesh(
             collision_ob,
-            openings=floor_openings()
+            openings=floor_openings_that_intersect(collision_ob)
         )
 
         print("    - Splitting collision mesh into convex pieces...")
@@ -1002,8 +1003,13 @@ def wall_openings_of(parent_ob):
         yield opening_ob
 
 
-def floor_openings():
-    for opening_ob in [o for o in bpy.data.objects if floor_opening_regex.match(o.name)]:
+def floor_openings_that_intersect(collision_ob):
+    openings = [
+        o for o in bpy.data.objects if
+        floor_opening_regex.match(o.name) and do_meshes_overlap(collision_ob, o)
+    ]
+
+    for opening_ob in openings:
         yield opening_ob
 
 
@@ -1048,6 +1054,30 @@ def make_all_faces_convex(ob):
     bpy.ops.mesh.select_all(action='SELECT')
     bpy.ops.mesh.vert_connect_concave()
     bpy.ops.mesh.select_all(action='DESELECT')
+
+
+def get_bvh_tree(obj):
+    """Create a BVH tree for a given object."""
+    mesh = obj.data
+
+    bm = bmesh.new()
+    bm.from_mesh(mesh)
+    bm.transform(obj.matrix_world)
+
+    bvh = BVHTree.FromBMesh(bm)
+
+    bm.free()
+
+    return bvh
+
+
+def do_meshes_overlap(obj1, obj2):
+    """Check if two objects' meshes overlap using BVH trees."""
+    bvh1 = get_bvh_tree(obj1)
+    bvh2 = get_bvh_tree(obj2)
+
+    # Check for intersections
+    return bvh1.overlap(bvh2)
 
 
 def make_convex_hull(ob):
