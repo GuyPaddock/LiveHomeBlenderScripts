@@ -1,15 +1,14 @@
 ##
 # Visualizes the structure of a Live Home 3D Pro Project.
 #
-# This script can be run on a `project.xml` file extracted from a Live Home 3D Pro (LH3DP) project
-# file (`.lhzd`, which is just a ZIP archive) to see an ASCII tree visualization of the objects in
-# the project.
+# This script can be run on a Live Home 3D Pro (LH3DP) project file (`.lhzd`) to see an ASCII tree
+# visualization of the objects in the project.
 #
 # This is useful because the UI of LH3DP has a limit on how many characters it will show in the
 # "Project Tree" sidebar. It can be used to identify any inconsistencies in the naming of objects
 # before exporting them to FBX for processing in Blender.
 # ==================================================================================================
-# Copyright (C) 2025 Guy Elsmore-Paddock
+# Copyright (C) 2025 Guy Elsmore-Paddock (with implementation by ChatGPT)
 #
 # This program is free software: you can redistribute it and/or modify it under the terms of the GNU
 # Affero General Public License as published by the Free Software Foundation, either version 3 of
@@ -24,6 +23,8 @@
 #
 
 import xml.etree.ElementTree as ET
+import zipfile
+import sys
 from collections import defaultdict
 
 EXCLUDED_CLASSES = {"Measurement", "UserCamera", "Camera", "MovieTrack"}
@@ -66,11 +67,18 @@ def parse_element(element, level=0, parent_map=None):
     return tree_str
 
 
-def generate_ascii_tree(xml_path):
-    """Generate an ASCII tree from a LiveHome 3D Pro XML file."""
-    tree = ET.parse(xml_path)
-    root = tree.getroot()
-    
+def extract_project_xml(zip_path):
+    """Extracts project.xml from the given ZIP file and returns its content."""
+    with zipfile.ZipFile(zip_path, 'r') as z:
+        with z.open("project.xml") as f:
+            return f.read()
+
+
+def generate_ascii_tree(zip_path):
+    """Generate an ASCII tree from a LiveHome 3D Pro project LHZD file."""
+    xml_content = extract_project_xml(zip_path)
+    root = ET.fromstring(xml_content)
+
     # Build a parent-child map
     parent_map = defaultdict(list)
     storeys = []
@@ -97,6 +105,10 @@ def generate_ascii_tree(xml_path):
 
 
 if __name__ == "__main__":
-    xml_file = "project.xml"  # Update this path if necessary
-    tree_output = generate_ascii_tree(xml_file)
+    if len(sys.argv) != 2:
+        print(f"Usage: python {sys.argv[0]} <project.lhzd>")
+        sys.exit(1)
+
+    zip_file = sys.argv[1]
+    tree_output = generate_ascii_tree(zip_file)
     print(tree_output)
