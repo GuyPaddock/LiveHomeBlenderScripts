@@ -89,9 +89,6 @@
 # You should have received a copy of the GNU Affero General Public License along with this program.
 # If not, see <http://www.gnu.org/licenses/>.
 #
-# @author Guy Elsmore-Paddock <guy.paddock@gmail.com>
-# @author Aaron Powell <aaron@lunadigital.tv>
-#
 
 import bmesh
 import bpy
