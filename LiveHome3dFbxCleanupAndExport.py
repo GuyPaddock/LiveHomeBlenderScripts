@@ -102,7 +102,7 @@ from mathutils import Vector
 from mathutils.bvhtree import BVHTree
 from pathlib import Path
 
-fbx_path = r"C:\PATH\TO\SWEET_HOME\Export.fbx"
+fbx_path = r"C:\PATH\TO\LIVE\HOME\Export.fbx"
 
 element_regex_str = \
     r"^SM_(?P<Room>(?:[^_]+))_(?P<Element>(?:(?:(?:Conduit(?:_\d{2})?_)?" \
