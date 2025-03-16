@@ -96,7 +96,7 @@ import re
 import sys
 import time
 
-from collections import OrderedDict
+from collections import OrderedDict, defaultdict
 from math import radians
 from mathutils import Vector
 from mathutils.bvhtree import BVHTree
@@ -148,6 +148,7 @@ slab_collision_regex_str = r"^House_Floor_\d{2}_Slab$"
 
 wall_opening_regex_str = r"^$NAME$_(?:(Door|Window)_[0-9]{2}_)?Opening(?:_[0-9]{2})?$"
 floor_opening_regex_str = r"^.+_Stairs_Opening(?:_\d{2})?$"
+multipart_opening_regex_str = r"^(?P<Prefix>.+Opening)_(\d{2})$"
 
 element_regex = re.compile(element_regex_str)
 unwanted_element_regex = re.compile(unwanted_element_regex_str)
@@ -160,6 +161,7 @@ roof_collision_regex = re.compile(roof_collision_regex_str)
 slab_collision_regex = re.compile(slab_collision_regex_str)
 
 floor_opening_regex = re.compile(floor_opening_regex_str)
+multipart_opening_regex = re.compile(multipart_opening_regex_str)
 
 
 def import_fbx(path):
@@ -731,43 +733,57 @@ def carve_openings_in_collision_mesh(collision_ob, openings):
     deselect_all_objects()
 
     subtraction_objects = []
+    multipart_openings = defaultdict(list)
 
     for opening in openings:
-        print(f"    - Carving opening of '{opening.name}'...")
+        multipart_match = multipart_opening_regex.match(opening.name)
+
+        # Special case: Collect multi-part openings for now so we can join them together, later.
+        if multipart_match is not None:
+            prefix = multipart_match.group('Prefix')
+            multipart_openings[prefix].append(opening)
+            continue
+
+        print(f"    - Preparing to carve opening of '{opening.name}'...")
 
         subtraction_ob = create_inplace_copy_of(opening)
 
-        subtraction_ob.select_set(True)
-        bpy.context.view_layer.objects.active = subtraction_ob
-
-        # Eliminate excess faces before making the convex hull.
-        bpy.ops.object.mode_set(mode='EDIT')
-        bpy.ops.mesh.dissolve_limited()
-        bpy.ops.object.mode_set(mode='OBJECT')
-
-        # Make a solid object out of the opening.
-        make_convex_hull(subtraction_ob)
+        solidify_subtraction_ob(subtraction_ob)
+        subtraction_objects.append(subtraction_ob)
         repaint_screen()
 
-        # Scale the subtraction object up by 15% so that it extends outside the collision object for
-        # boolean subtraction to work properly.
-        bpy.ops.object.mode_set(mode='OBJECT')
-        bpy.ops.object.modifier_add(type='SOLIDIFY')
-        bpy.context.object.modifiers["Solidify"].thickness = 0.15
-        bpy.context.object.modifiers["Solidify"].offset = 0
-        bpy.ops.object.modifier_apply(modifier="Solidify")
+    # Special case: Multi-part openings need to be joined together before we use them.
+    for prefix, openings in multipart_openings.items():
+        print(f"    - Preparing to carve openings for '{prefix}'...")
 
-        repaint_screen()
+        # Even more special case: An opening that looks like a multi-part opening, but actually is
+        # just a single opening. In that case, handle it as if it were not multi-part. We couldn't
+        # do this in the first loop above because we needed to identify all the openings that were
+        # part of this list of openings first.
+        if len(openings) == 1:
+            subtraction_ob = create_inplace_copy_of(openings[0])
+            solidify_subtraction_ob(subtraction_ob)
+        else:
+            multipart_subtraction_obs = []
 
-        # Make the hollow center of the subtraction object solid.
-        make_convex_hull(subtraction_ob)
+            # Create duplicates of all the openings and then join them together.
+            #
+            # BUGBUG: We can't solidify the combined opening because it results in gaps between the
+            # openings.
+            for opening in openings:
+                multipart_subtraction_ob = create_inplace_copy_of(opening)
+                multipart_subtraction_obs.append(multipart_subtraction_ob)
+
+            subtraction_ob = join_objects(multipart_subtraction_obs)
 
         subtraction_objects.append(subtraction_ob)
 
-        deselect_all_objects()
         repaint_screen()
 
+    multipart_openings = None
+
     if len(subtraction_objects) > 0:
+        print(f"    - Carving openings...")
         # Join the subtraction meshes into a single mesh, so we only have to carve the collision
         # mesh once. This reduces the number of artifacts we introduce into the collision mesh.
         subtraction_ob = join_objects(subtraction_objects)
@@ -1021,6 +1037,34 @@ def floor_openings_that_intersect(collision_ob):
 
     for opening_ob in openings:
         yield opening_ob
+
+
+def solidify_subtraction_ob(subtraction_ob):
+    deselect_all_objects()
+
+    subtraction_ob.select_set(True)
+    bpy.context.view_layer.objects.active = subtraction_ob
+
+    # Eliminate excess faces before making the convex hull.
+    bpy.ops.object.mode_set(mode='EDIT')
+    bpy.ops.mesh.dissolve_limited()
+    bpy.ops.object.mode_set(mode='OBJECT')
+
+    # Make a solid object out of the opening.
+    make_convex_hull(subtraction_ob)
+    repaint_screen()
+
+    # Scale the subtraction object up by 15% so that it extends outside the collision object for
+    # boolean subtraction to work properly.
+    bpy.ops.object.mode_set(mode='OBJECT')
+    bpy.ops.object.modifier_add(type='SOLIDIFY')
+    bpy.context.object.modifiers["Solidify"].thickness = 0.15
+    bpy.context.object.modifiers["Solidify"].offset = 0
+    bpy.ops.object.modifier_apply(modifier="Solidify")
+    repaint_screen()
+
+    # Make the hollow center of the subtraction object solid.
+    make_convex_hull(subtraction_ob)
 
 
 def remesh_very_high_resolution(ob):
