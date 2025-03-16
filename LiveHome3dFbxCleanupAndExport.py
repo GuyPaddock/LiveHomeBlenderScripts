@@ -124,6 +124,7 @@ element_regex_str = \
 # Uncomment the second line and customize it to debug processing with just a subset of the geometry.
 unwanted_element_regex_str = r"^.+((_(Door|Window)_\d{2})|(Placeholder.*))$"
 # unwanted_element_regex_str = "^((?!(.*_Floor_02|(Hallway|ScottRoom)_Floor|.*Stairs_Opening.*)).*)|(.+((_(Door|Window)_\d{2})|(Placeholder.*)))$"
+# unwanted_element_regex_str = "^((?!(.*Stairs_Opening.*|.*_02_Slab)).*)|(.+((_(Door|Window)_\d{2})|(Placeholder.*)))$"
 
 prefix_regex_str = \
     r"^(?P<Prefix>(?:Closet_)?(?:Conduit(?:_\d{2})?_)?" \
