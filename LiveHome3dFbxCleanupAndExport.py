@@ -104,6 +104,14 @@ from pathlib import Path
 
 fbx_path = r"C:\PATH\TO\LIVE\HOME\Export.fbx"
 
+# The center of the scene is normally calculated as the center of volume. If you need the center of
+# the scene to be constant from import to import (e.g., for revising the same LH 3D scene), you can
+# uncomment the second line below and set it to a specific point in the scene. This point will be
+# shifted to be the origin (0, 0, 0) for exports.
+fbx_fixed_scene_center = None
+# fbx_fixed_scene_center = Vector((0.0, 0.0, 0.0))
+# fbx_fixed_scene_center = Vector((32.76048278808594 - 0.05441, 48.72707748413086 + 0.09118, 3.8340983390808105))
+
 element_regex_str = \
     r"^SM_(?P<Room>(?:[^_]+))_(?P<Element>(?:(?:(?:Conduit(?:_\d{2})?_)?" \
     r"(?:Closet_)?)(?:CeilingTrim" \
@@ -366,9 +374,16 @@ def translate_origin_of_all_objects_to_world_origin():
     n = len(obs)
     assert n
 
-    print("  - Calculating center of the scene...")
+    if fbx_fixed_scene_center is None:
+        print("  - Calculating center of the scene...")
+        scene_center = sum([o.matrix_world.translation for o in obs], Vector()) / n
+        print(f"  - The center of the scene is: {scene_center.x}, {scene_center.y}, {scene_center.z}")
+    else:
+        scene_center = fbx_fixed_scene_center
+        print(f"  - The center of the scene is: {scene_center.x}, {scene_center.y}, {scene_center.z} (set by constant)")
+
     cursor = bpy.context.scene.cursor
-    cursor.location = sum([o.matrix_world.translation for o in obs], Vector()) / n
+    cursor.location = scene_center
     cursor.location.z = 0
 
     # Move objects back to origin of scene
