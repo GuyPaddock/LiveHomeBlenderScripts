@@ -113,21 +113,25 @@ fbx_fixed_scene_center = None
 # fbx_fixed_scene_center = Vector((32.76048278808594 - 0.05441, 48.72707748413086 + 0.09118, 3.8340983390808105))
 
 element_regex_str = \
-    r"^SM_(?P<Room>(?:[^_]+))_(?P<Element>(?:(?:(?:Conduit(?:_\d{2})?_)?" \
-    r"(?:Closet_)?)(?:CeilingTrim" \
-    r"|Ceiling(?:_\d{2})?" \
-    r"|Floor(?:_\d{2}(?:_Slab)?)?" \
-    r"|(?:Stair)?Wall_\d{2}(?:_(?:(?:Moulding_(?:Base|Crown)_(?:Left|Right))" \
-    r"|(?:Garden)?Window(?:_\d{2})?(?:_Opening)?" \
-    r"|Door_\d{2}(?:_Opening)?" \
-    r"|Opening(?:_\d{2})?))?" \
-    r"|WallPanel(?:_\d{2})?|Roof(?:_\d{2})?" \
-    r"(?:_(?:Gable|Hole|Side|SegmentedSide|Vent)(?:_\d{2})?)?" \
-    r"(?:_Window_\d{2}(?:_Opening)?)?" \
-    r"|Post(?:_\d{2})?" \
-    r"|Stairs(?:_Opening)?(?:_\d{2})?" \
-    r"|Conduit" \
-    r"|Tub_Shelf))(?:_Placeholder(?:_\d{2})?)?)?(?P<Garbage>.*)$"
+    (r"^SM_(?P<Room>(?:[^_]+))"
+     r"_"
+     r"(?P<Element>(?:"
+     r"(?:(?:Conduit(?:_\d{2})?_)?(?:Closet_)?)"
+     r"(?:CeilingTrim"
+     r"|Ceiling(?:_\d{2})?"
+     r"|Floor(?:_\d{2}_Slab)?"
+     r"|(?:Stair)?Wall_\d{2}(?:_(?:(?:Moulding_(?:Base|Crown)_(?:Left|Right))"
+     r"|(?:Garden)?Window(?:_\d{2})?(?:_Opening)?"
+     r"|Door_\d{2}(?:_Opening)?"
+     r"|Opening(?:_\d{2})?))?"
+     r"|WallPanel(?:_\d{2})?"
+     r"|Roof(?:_\d{2})?(?:_(?:Gable|Hole|Side|SegmentedSide|Vent)(?:_\d{2})?)?(?:_Window_\d{2}(?:_Opening)?)?"
+     r"|Post(?:_\d{2})?"
+     r"|Stairs(?:_Opening)?(?:_\d{2})?"
+     r"|Conduit"
+     r"|Tub_Shelf))"
+     r"(?:_Placeholder(?:_\d{2})?)?)?"
+     r"(?P<Garbage>_.*)?$")
 
 # Uncomment the second line and customize it to debug processing with just a subset of the geometry.
 unwanted_element_regex_str = r"^.+((_(Door|Window)_\d{2})|(Placeholder.*))$"
