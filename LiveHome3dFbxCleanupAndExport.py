@@ -149,7 +149,7 @@ prefix_regex_str = \
 # - Door openings are included in this pattern to ensure that floors that are adjacent to door openings line up for
 #   textures like hardwood floors.
 continuous_uv_regex_str = \
-    r"^.+_(?:(?:Wall|StairWall|Roof(?:_\d{2})?_(Gable|Side|SegmentedSide)|Ceiling|Floor|Slab)(?:_\d{2})?)" \
+    r"^.+_(?:(?:Wall|StairWall|Ceiling|Floor|Slab)(?:_\d{2})?)" \
     r"(?:(?:_Door(?:_\d{2})?_Opening)?|_Opening(?:_\d{2})?)$"
 
 # Ceilings are in this list because the player might jump up in a low area (e.g., a porch).
@@ -504,7 +504,7 @@ def generate_diffuse_uvs():
     deselect_all_objects()
     apply_uv_func(uv_map_name, box_uv_project)
 
-    # Now, separate the walls back into separate objects so we can generate collection.
+    # Now, break the objects back out to separate objects so we can generate collision.
     # Each object name was used as a vertex group name before the objects were joined.
     for (object_name, collection_name) in continuous_uv_object_names_and_collections:
         status_print(f"  - Splitting vertex group '{object_name}' back out to object...")
